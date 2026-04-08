@@ -4,13 +4,14 @@
 #include <QUrl>
 
 class ConfigManager;
+class CookieStore;
 class QLineEdit;
 class QToolBar;
 class QProgressBar;
 class QAction;
 class QLabel;
 class QWebEngineView;
-class QWebEnginePage;
+class QWebEngineProfile;
 
 class MainWindow : public QMainWindow
 {
@@ -20,11 +21,11 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-protected:
-    void closeEvent(QCloseEvent *event) override;
-
 public slots:
     void navigateTo(const QUrl &url);
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void onUrlBarReturn();
@@ -33,8 +34,10 @@ private:
     void setupUi();
     void setupConnections();
 
-    QWebEngineView *m_view;
-    ConfigManager  *m_config;
+    QWebEngineView    *m_view;
+    QWebEngineProfile *m_profile;
+    ConfigManager     *m_config;
+    CookieStore       *m_cookieStore;
 
     QLineEdit    *m_urlBar;
     QAction      *m_backAction;

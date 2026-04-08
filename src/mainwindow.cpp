@@ -1,9 +1,12 @@
 #include "mainwindow.h"
 #include "configmanager.h"
+#include "cookiestore.h"
 
 #include <QWebEngineView>
 #include <QWebEnginePage>
+#include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QWebEngineCookieStore>
 #include <QWebEngineHistory>
 #include <QMenu>
 #include <QAction>
@@ -11,9 +14,10 @@
 #include <QToolBar>
 #include <QStatusBar>
 #include <QProgressBar>
-#include <QAction>
 #include <QLabel>
 #include <QCloseEvent>
+#include <QStandardPaths>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -21,7 +25,44 @@ MainWindow::MainWindow(QWidget *parent)
 {
     m_config->load();
 
+    // ── Persistent profil ──────────────────────────────────────────────────
+    m_profile = new QWebEngineProfile("nimrod", this);
+
+    // Perzisztens tároló: ~/.local/share/nimrod/QtWebEngine/nimrod/
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    QDir().mkpath(dataPath);
+    m_profile->setPersistentStoragePath(dataPath);
+    m_profile->setCachePath(dataPath + "/cache");
+    m_profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
+    m_profile->setPersistentCookiesPolicy(QWebEngineProfile::AllowPersistentCookies);
+
+    // ── JavaScript és egyéb beállítások ────────────────────────────────────
+    QWebEngineSettings *settings = m_profile->settings();
+    settings->setAttribute(QWebEngineSettings::JavascriptEnabled,            true);
+    settings->setAttribute(QWebEngineSettings::LocalStorageEnabled,          true);
+    settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows,     true);
+    settings->setAttribute(QWebEngineSettings::PluginsEnabled,               true);
+    settings->setAttribute(QWebEngineSettings::ScrollAnimatorEnabled,        true);
+    settings->setAttribute(QWebEngineSettings::FullScreenSupportEnabled,     true);
+    settings->setAttribute(QWebEngineSettings::WebGLEnabled,                 true);
+    settings->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled,   true);
+    settings->setAttribute(QWebEngineSettings::AutoLoadImages,               true);
+    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
+
+    // ── SQLite cookie tár ──────────────────────────────────────────────────
+    QString configDir = QDir::homePath() + "/.config/nimrod";
+    QDir().mkpath(configDir);
+
+    m_cookieStore = new CookieStore(this);
+    if (m_cookieStore->init(configDir + "/cookies.db")) {
+        m_cookieStore->loadInto(m_profile->cookieStore());
+        m_cookieStore->connectTo(m_profile->cookieStore());
+    }
+
+    // ── WebView ────────────────────────────────────────────────────────────
+    QWebEnginePage *page = new QWebEnginePage(m_profile, this);
     m_view = new QWebEngineView(this);
+    m_view->setPage(page);
 
     // Jobb klikk menü bővítése
     m_view->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -49,7 +90,7 @@ MainWindow::MainWindow(QWidget *parent)
     move(m_config->windowPos());
 
     QString lastUrl = m_config->lastUrl();
-    navigateTo(QUrl(lastUrl.isEmpty() ? "https://html5test.com" : lastUrl));
+    navigateTo(QUrl(lastUrl.isEmpty() ? "https://www.google.com" : lastUrl));
 }
 
 MainWindow::~MainWindow() {}
@@ -125,7 +166,6 @@ void MainWindow::setupConnections()
         m_forwardAction->setEnabled(m_view->history()->canGoForward());
     });
 
-    // Link hover → URL megjelenítés alul
     connect(m_view->page(), &QWebEnginePage::linkHovered, this, [this](const QString &url) {
         m_statusLabel->setText(url.isEmpty() ? "Kész." : url);
     });

@@ -7,17 +7,19 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets Sql)
 
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
     src/configmanager.cpp
+    src/cookiestore.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
     src/configmanager.h
+    src/cookiestore.h
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
@@ -27,4 +29,5 @@ target_link_libraries(${PROJECT_NAME}
     Qt6::Gui
     Qt6::Widgets
     Qt6::WebEngineWidgets
+    Qt6::Sql
 )
