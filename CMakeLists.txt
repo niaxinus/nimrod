@@ -14,12 +14,16 @@ set(SOURCES
     src/mainwindow.cpp
     src/configmanager.cpp
     src/cookiestore.cpp
+    src/jsconsole.cpp
+    src/scriptmanager.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
     src/configmanager.h
     src/cookiestore.h
+    src/jsconsole.h
+    src/scriptmanager.h
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
