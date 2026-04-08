@@ -11,6 +11,8 @@
 #include <QKeyEvent>
 #include <QDateTime>
 #include <QFont>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 // ── Beviteli sor – history kezeléssel ───────────────────────────────────────
 
@@ -133,24 +135,43 @@ void JsConsole::runCode(const QString &code)
         return;
     }
 
-    QString escaped = code;
-    escaped.replace('\\', "\\\\");
-    escaped.replace('"',  "\\\"");
-    escaped.replace('\n', "\\n");
-    escaped.replace('\r', "\\r");
+    // A kódot KÖZVETLENÜL injektáljuk – nem kell string-escaping,
+    // nem használunk QString::arg-ot (törné a %-os kifejezéseket).
+    // Visszatérési érték: JSON envelope {ok:bool, v:string}
+    // → Qt bridge mindig valid JSON-t kap, nem dob belső hibát.
+    QString js =
+        "(function(){\n"
+        "  try {\n"
+        "    var _r = (function(){\n"
+        + code + "\n"
+        "    })();\n"
+        "    var _s;\n"
+        "    if (typeof _r === 'undefined') { _s = 'undefined'; }\n"
+        "    else if (_r === null)           { _s = 'null'; }\n"
+        "    else if (typeof _r === 'object') {\n"
+        "      try { _s = JSON.stringify(_r, null, 2); }\n"
+        "      catch(_e) { _s = String(_r); }\n"
+        "    } else { _s = String(_r); }\n"
+        "    return JSON.stringify({ok:true, v:_s});\n"
+        "  } catch(e) {\n"
+        "    return JSON.stringify({ok:false, v:e.toString()});\n"
+        "  }\n"
+        "})()";
 
-    m_page->runJavaScript(
-        QString("(function(){ try { var _r = eval(\"%1\"); "
-                "return typeof _r==='undefined'?'undefined':"
-                "typeof _r==='object'&&_r!==null?JSON.stringify(_r,null,2):String(_r);"
-                "} catch(e){ return 'HIBA: '+e.message; } })()")
-            .arg(escaped),
-        [this](const QVariant &result) {
-            QString r = result.toString();
-            bool isErr = r.startsWith("HIBA:");
-            appendOutput(r, isErr);
+    m_page->runJavaScript(js, [this](const QVariant &result) {
+        QString raw = result.toString();
+        // Qt bridge string-ként adja vissza a JSON envelope-ot
+        QJsonDocument doc = QJsonDocument::fromJson(raw.toUtf8());
+        if (doc.isNull() || !doc.isObject()) {
+            // Fallback: ha valami nagyon elromlott
+            appendOutput(raw.isEmpty() ? "(nincs eredmény)" : raw, false);
+            return;
         }
-    );
+        QJsonObject obj = doc.object();
+        bool ok = obj.value("ok").toBool(true);
+        QString v = obj.value("v").toString();
+        appendOutput(v.isEmpty() ? "(nincs eredmény)" : v, !ok);
+    });
 }
 
 void JsConsole::historyUp()
