@@ -1,5 +1,8 @@
 #include "htmlrenderer.h"
 #include "csspreprocessor.h"
+#include "htmlnormalizer.h"
+#include "cssselectorengine.h"
+#include "csslayoutconverter.h"
 
 #include <QRegularExpression>
 #include <QTextDocument>
@@ -14,6 +17,9 @@
 HtmlRenderer::HtmlRenderer(QWidget *parent)
     : QTextBrowser(parent)
     , m_css(new CssPreprocessor(this))
+    , m_normalizer(new HtmlNormalizer(this))
+    , m_selectorEngine(new CssSelectorEngine(this))
+    , m_layoutConverter(new CssLayoutConverter(this))
     , m_nam(new QNetworkAccessManager(this))
 {
     setOpenLinks(false);
@@ -36,10 +42,19 @@ void HtmlRenderer::renderHtml(const QString &html, const QUrl &baseUrl)
     // JS eltávolítása
     QString cleanHtml = stripJavaScript(html);
 
-    // CSS kinyerés és alkalmazás
+    // 1. HTML5 normalizálás (szemantikus tagek → HTML4 ekvivalens)
+    cleanHtml = m_normalizer->normalize(cleanHtml);
+
+    // 2. CSS kinyerés és preprocesszálás
     QSize viewport = size().isEmpty() ? QSize(1024, 768) : size();
     QString css = m_css->process(cleanHtml, baseUrl, viewport);
+
+    // 3. CSS Layout konverzió (flex/grid → table)
+    cleanHtml = m_layoutConverter->convert(cleanHtml);
+
+    // 4. CSS szelektorok → inline style inject
     if (!css.isEmpty()) {
+        cleanHtml = m_selectorEngine->apply(cleanHtml, css);
         document()->setDefaultStyleSheet(css);
     }
 

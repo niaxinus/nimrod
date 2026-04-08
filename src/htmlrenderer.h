@@ -8,6 +8,9 @@
 #include <QNetworkAccessManager>
 
 class CssPreprocessor;
+class HtmlNormalizer;
+class CssSelectorEngine;
+class CssLayoutConverter;
 
 class HtmlRenderer : public QTextBrowser
 {
@@ -37,6 +40,9 @@ private:
     QByteArray fetchResource(const QUrl &url);
 
     CssPreprocessor       *m_css;
+    HtmlNormalizer        *m_normalizer;
+    CssSelectorEngine     *m_selectorEngine;
+    CssLayoutConverter    *m_layoutConverter;
     QNetworkAccessManager *m_nam;
     QMap<QUrl, QByteArray> m_imageCache;
     QUrl                   m_baseUrl;
