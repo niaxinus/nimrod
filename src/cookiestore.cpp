@@ -43,11 +43,25 @@ void CookieStore::createSchema()
 {
     QSqlDatabase db = QSqlDatabase::database(m_connectionName);
     QSqlQuery q(db);
+
+    // Schema verzió tábla
+    q.exec(R"(CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL))");
+    q.exec("SELECT version FROM schema_version");
+    int version = q.next() ? q.value(0).toInt() : 0;
+
+    if (version < 2) {
+        // Régi text-alapú séma nem bináris-biztos – töröljük és újracsináljuk
+        q.exec("DROP TABLE IF EXISTS cookies");
+        q.exec("DELETE FROM schema_version");
+        q.exec("INSERT INTO schema_version (version) VALUES (2)");
+        qDebug() << "CookieStore: séma frissítve v2 (BLOB értékek)";
+    }
+
     q.exec(R"(
         CREATE TABLE IF NOT EXISTS cookies (
             id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            name     TEXT    NOT NULL,
-            value    TEXT,
+            name     BLOB    NOT NULL,
+            value    BLOB,
             domain   TEXT    NOT NULL,
             path     TEXT    NOT NULL DEFAULT '/',
             expiry   INTEGER DEFAULT 0,
@@ -128,8 +142,8 @@ void CookieStore::onCookieAdded(const QNetworkCookie &cookie)
             secure   = excluded.secure,
             httponly = excluded.httponly
     )");
-    q.bindValue(":name",     QString::fromUtf8(cookie.name()));
-    q.bindValue(":value",    QString::fromUtf8(cookie.value()));
+    q.bindValue(":name",     cookie.name());           // QByteArray → BLOB
+    q.bindValue(":value",    cookie.value());          // QByteArray → BLOB (bináris-biztos)
     q.bindValue(":domain",   cookie.domain());
     q.bindValue(":path",     cookie.path());
     q.bindValue(":expiry",   expiry);
@@ -145,7 +159,7 @@ void CookieStore::onCookieRemoved(const QNetworkCookie &cookie)
 
     QSqlQuery q(db);
     q.prepare("DELETE FROM cookies WHERE name=:name AND domain=:domain AND path=:path");
-    q.bindValue(":name",   QString::fromUtf8(cookie.name()));
+    q.bindValue(":name",   cookie.name());   // QByteArray → BLOB
     q.bindValue(":domain", cookie.domain());
     q.bindValue(":path",   cookie.path());
     q.exec();
