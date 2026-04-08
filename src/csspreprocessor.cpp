@@ -42,6 +42,9 @@ QString CssPreprocessor::process(const QString &html, const QUrl &baseUrl, const
     // 6. Media query szűrés
     css = filterMediaQueries(css, viewport);
 
+    // 7. Shorthand tulajdonságok kibontása
+    css = expandShorthands(css);
+
     return css.trimmed();
 }
 
@@ -319,5 +322,180 @@ QString CssPreprocessor::filterMediaQueries(const QString &css, const QSize &vie
         delta += replacement.length() - len;
     }
 
+    return result;
+}
+
+// ── Shorthand kibontás ───────────────────────────────────────────────────────
+
+static QString normalizeValue(const QString &v) { return v.trimmed().toLower(); }
+
+QString CssPreprocessor::expandBackground(const QString &value) const
+{
+    QString v = value.trimmed();
+    QStringList parts;
+
+    // Szín: color name, #xxx, rgb(), rgba()
+    static QRegularExpression colorRe(
+        R"((?:^|\s)(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|[a-zA-Z]+)(?=\s|$))"
+    );
+    static QRegularExpression urlRe(R"(url\(["']?[^"')]+["']?\))");
+    static QRegularExpression posRe(R"(\b(top|bottom|left|right|center|\d+%|\d+px)\s+(top|bottom|left|right|center|\d+%|\d+px)\b)");
+    static QRegularExpression repeatRe(R"(\b(no-repeat|repeat-x|repeat-y|repeat)\b)");
+
+    QString result;
+    QString color, bgImage, bgRepeat = "repeat", bgPos = "0% 0%";
+
+    auto urlM = urlRe.match(v);
+    if (urlM.hasMatch()) bgImage = urlM.captured(0);
+
+    auto posM = posRe.match(v);
+    if (posM.hasMatch()) bgPos = posM.captured(0);
+
+    auto repM = repeatRe.match(v);
+    if (repM.hasMatch()) bgRepeat = repM.captured(1);
+
+    // Szín: ha nem URL és nem pozíció és nem repeat → szín
+    QString stripped = v;
+    if (!bgImage.isEmpty()) stripped.remove(urlM.captured(0));
+    if (posM.hasMatch())    stripped.remove(posM.captured(0));
+    if (repM.hasMatch())    stripped.remove(repM.captured(0));
+    stripped = stripped.trimmed().remove(';');
+
+    if (!stripped.isEmpty()) color = stripped;
+
+    if (!bgImage.isEmpty()) result += "background-image:" + bgImage + ";";
+    if (!color.isEmpty())   result += "background-color:" + color + ";";
+    result += "background-repeat:" + bgRepeat + ";";
+    result += "background-position:" + bgPos + ";";
+    return result;
+}
+
+QString CssPreprocessor::expandFont(const QString &value) const
+{
+    // Formátum: [font-style] [font-variant] [font-weight] font-size[/line-height] font-family
+    QString v = value.trimmed();
+    QString result;
+
+    // font-size/line-height kinyerés
+    static QRegularExpression sizeRe(R"(([\d.]+(?:px|em|rem|pt|%))(?:\s*/\s*([\d.]+(?:px|em|rem|pt|%|normal)))?)");
+    auto sm = sizeRe.match(v);
+    if (sm.hasMatch()) {
+        result += "font-size:" + sm.captured(1) + ";";
+        if (!sm.captured(2).isEmpty())
+            result += "line-height:" + sm.captured(2) + ";";
+    }
+
+    if (v.contains("italic") || v.contains("oblique"))
+        result += "font-style:" + QString(v.contains("italic") ? "italic" : "oblique") + ";";
+    if (v.contains("bold"))
+        result += "font-weight:bold;";
+    else if (v.contains("normal") && !v.contains("font-weight"))
+        result += "font-weight:normal;";
+
+    // Font-family: az utolsó token(ek) a méret után
+    if (sm.hasMatch()) {
+        QString afterSize = v.mid(sm.capturedEnd()).trimmed().remove(';');
+        if (!afterSize.isEmpty())
+            result += "font-family:" + afterSize + ";";
+    }
+
+    return result.isEmpty() ? "font:" + value + ";" : result;
+}
+
+QString CssPreprocessor::expandBorder(const QString &value, const QString &side) const
+{
+    // Formátum: width style color
+    static QRegularExpression widthRe(R"((\d+(?:\.\d+)?(?:px|em|rem|pt))\b)");
+    static QRegularExpression styleRe(R"(\b(none|hidden|solid|dashed|dotted|double|groove|ridge|inset|outset)\b)");
+    static QRegularExpression colorRe(R"(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|[a-zA-Z]+$)");
+
+    QString v = value.trimmed();
+    QString prefix = side.isEmpty() ? "border" : "border-" + side;
+    QString result;
+
+    auto wm = widthRe.match(v);
+    auto sm = styleRe.match(v);
+    auto cm = colorRe.match(v);
+
+    if (wm.hasMatch()) result += prefix + "-width:" + wm.captured(1) + ";";
+    if (sm.hasMatch()) result += prefix + "-style:" + sm.captured(1) + ";";
+    if (cm.hasMatch()) result += prefix + "-color:" + cm.captured(0) + ";";
+
+    return result.isEmpty() ? prefix + ":" + value + ";" : result;
+}
+
+QString CssPreprocessor::expandMarginPadding(const QString &prop, const QString &value) const
+{
+    QStringList parts = value.trimmed().split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    QString t, r, b, l;
+    switch (parts.size()) {
+        case 1: t = r = b = l = parts[0]; break;
+        case 2: t = b = parts[0]; r = l = parts[1]; break;
+        case 3: t = parts[0]; r = l = parts[1]; b = parts[2]; break;
+        case 4: t = parts[0]; r = parts[1]; b = parts[2]; l = parts[3]; break;
+        default: return prop + ":" + value + ";";
+    }
+    return prop + "-top:" + t + ";" +
+           prop + "-right:" + r + ";" +
+           prop + "-bottom:" + b + ";" +
+           prop + "-left:" + l + ";";
+}
+
+QString CssPreprocessor::expandShorthands(const QString &css) const
+{
+    // Minden szabályban a shorthand tulajdonságokat kibontjuk
+    static QRegularExpression ruleRe(
+        R"(([^{]+)\{([^}]*)\})",
+        QRegularExpression::DotMatchesEverythingOption
+    );
+
+    QString result;
+    result.reserve(css.size() + css.size() / 4);
+    int last = 0;
+    auto it = ruleRe.globalMatch(css);
+
+    while (it.hasNext()) {
+        auto m = it.next();
+        result += css.mid(last, m.capturedStart() - last);
+        last = m.capturedEnd();
+
+        QString selector = m.captured(1);
+        QString decls    = m.captured(2);
+
+        // @-blokkok átadása változatlanul
+        if (selector.trimmed().startsWith('@')) {
+            result += m.captured(0);
+            continue;
+        }
+
+        // Deklarációk feldolgozása
+        QString expanded;
+        for (const QString &decl : decls.split(';', Qt::SkipEmptyParts)) {
+            int colon = decl.indexOf(':');
+            if (colon < 0) { expanded += decl.trimmed() + ";"; continue; }
+
+            QString prop = decl.left(colon).trimmed().toLower();
+            QString val  = decl.mid(colon + 1).trimmed();
+
+            if (prop == "background" && !val.startsWith("url") && !val.contains("gradient")) {
+                expanded += expandBackground(val);
+            } else if (prop == "font" && !val.isEmpty()) {
+                expanded += expandFont(val);
+            } else if (prop == "border") {
+                expanded += expandBorder(val);
+            } else if (prop == "border-top")    { expanded += expandBorder(val, "top"); }
+            else if (prop == "border-right")     { expanded += expandBorder(val, "right"); }
+            else if (prop == "border-bottom")    { expanded += expandBorder(val, "bottom"); }
+            else if (prop == "border-left")      { expanded += expandBorder(val, "left"); }
+            else if (prop == "margin" || prop == "padding") {
+                expanded += expandMarginPadding(prop, val);
+            } else {
+                expanded += prop + ":" + val + ";";
+            }
+        }
+
+        result += selector + "{" + expanded + "}";
+    }
+    result += css.mid(last);
     return result;
 }

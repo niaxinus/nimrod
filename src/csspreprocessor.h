@@ -44,8 +44,13 @@ private:
     QString resolveCustomProperties(const QString &css) const;
     QString resolveCalc(const QString &css) const;
     QString filterMediaQueries(const QString &css, const QSize &viewport) const;
+    QString expandShorthands(const QString &css) const;
 
     double evaluateCalcExpression(const QString &expr) const;
+    QString expandBackground(const QString &value) const;
+    QString expandFont(const QString &value) const;
+    QString expandBorder(const QString &value, const QString &side = QString()) const;
+    QString expandMarginPadding(const QString &prop, const QString &value) const;
 
     QMap<QUrl, QString> m_cache;
     static constexpr int MaxImportDepth = 5;
