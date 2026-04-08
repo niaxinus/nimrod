@@ -5,6 +5,8 @@
 #include <QWebEnginePage>
 #include <QWebEngineSettings>
 #include <QWebEngineHistory>
+#include <QMenu>
+#include <QAction>
 #include <QLineEdit>
 #include <QToolBar>
 #include <QStatusBar>
@@ -20,6 +22,24 @@ MainWindow::MainWindow(QWidget *parent)
     m_config->load();
 
     m_view = new QWebEngineView(this);
+
+    // Jobb klikk menü bővítése
+    m_view->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_view, &QWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
+        QMenu *menu = m_view->createStandardContextMenu();
+        menu->addSeparator();
+        QAction *sourceAction = menu->addAction("Oldal forrásának megtekintése");
+        connect(sourceAction, &QAction::triggered, this, [this]() {
+            QUrl sourceUrl("view-source:" + m_view->url().toString());
+            MainWindow *sourceWindow = new MainWindow();
+            sourceWindow->setAttribute(Qt::WA_DeleteOnClose);
+            sourceWindow->navigateTo(sourceUrl);
+            sourceWindow->show();
+        });
+        menu->exec(m_view->mapToGlobal(pos));
+        menu->deleteLater();
+    });
+
     setCentralWidget(m_view);
 
     setupUi();

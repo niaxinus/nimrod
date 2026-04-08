@@ -10,6 +10,7 @@ class QProgressBar;
 class QAction;
 class QLabel;
 class QWebEngineView;
+class QWebEnginePage;
 
 class MainWindow : public QMainWindow
 {
@@ -22,9 +23,11 @@ public:
 protected:
     void closeEvent(QCloseEvent *event) override;
 
+public slots:
+    void navigateTo(const QUrl &url);
+
 private slots:
     void onUrlBarReturn();
-    void navigateTo(const QUrl &url);
 
 private:
     void setupUi();
