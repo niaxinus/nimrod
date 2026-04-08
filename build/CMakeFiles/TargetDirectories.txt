@@ -1,5 +1,0 @@
-/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/CMakeFiles/nimrod.dir
-/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/CMakeFiles/edit_cache.dir
-/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/CMakeFiles/rebuild_cache.dir
-/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/CMakeFiles/nimrod_autogen_timestamp_deps.dir
-/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/CMakeFiles/nimrod_autogen.dir

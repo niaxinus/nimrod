@@ -3,6 +3,9 @@
 #include <QTextBrowser>
 #include <QString>
 #include <QUrl>
+#include <QMap>
+#include <QByteArray>
+#include <QNetworkAccessManager>
 
 class CssPreprocessor;
 
@@ -24,8 +27,18 @@ signals:
 private slots:
     void onAnchorClicked(const QUrl &url);
 
+protected:
+    // Képbetöltés override – QTextBrowser ezt hívja img src-hez
+    QVariant loadResource(int type, const QUrl &url) override;
+
 private:
     QString extractTitle(const QString &html) const;
+    QString stripJavaScript(const QString &html) const;
+    QByteArray fetchResource(const QUrl &url);
 
-    CssPreprocessor *m_css;
+    CssPreprocessor       *m_css;
+    QNetworkAccessManager *m_nam;
+    QMap<QUrl, QByteArray> m_imageCache;
+    QUrl                   m_baseUrl;
 };
+
