@@ -203,6 +203,30 @@ src/configmanager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/nimrod.dir/build.make CMakeFiles/nimrod.dir/src/configmanager.cpp.s
 .PHONY : src/configmanager.cpp.s
 
+src/csspreprocessor.o: src/csspreprocessor.cpp.o
+.PHONY : src/csspreprocessor.o
+
+# target to build an object file
+src/csspreprocessor.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/nimrod.dir/build.make CMakeFiles/nimrod.dir/src/csspreprocessor.cpp.o
+.PHONY : src/csspreprocessor.cpp.o
+
+src/csspreprocessor.i: src/csspreprocessor.cpp.i
+.PHONY : src/csspreprocessor.i
+
+# target to preprocess a source file
+src/csspreprocessor.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/nimrod.dir/build.make CMakeFiles/nimrod.dir/src/csspreprocessor.cpp.i
+.PHONY : src/csspreprocessor.cpp.i
+
+src/csspreprocessor.s: src/csspreprocessor.cpp.s
+.PHONY : src/csspreprocessor.s
+
+# target to generate assembly for a file
+src/csspreprocessor.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/nimrod.dir/build.make CMakeFiles/nimrod.dir/src/csspreprocessor.cpp.s
+.PHONY : src/csspreprocessor.cpp.s
+
 src/htmlrenderer.o: src/htmlrenderer.cpp.o
 .PHONY : src/htmlrenderer.o
 
@@ -316,6 +340,9 @@ help:
 	@echo "... src/configmanager.o"
 	@echo "... src/configmanager.i"
 	@echo "... src/configmanager.s"
+	@echo "... src/csspreprocessor.o"
+	@echo "... src/csspreprocessor.i"
+	@echo "... src/csspreprocessor.s"
 	@echo "... src/htmlrenderer.o"
 	@echo "... src/htmlrenderer.i"
 	@echo "... src/htmlrenderer.s"

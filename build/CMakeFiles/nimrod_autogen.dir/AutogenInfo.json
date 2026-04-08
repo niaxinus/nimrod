@@ -181,6 +181,12 @@
 			null
 		],
 		[
+			"/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/csspreprocessor.h",
+			"MU",
+			"UVLADIE3JM/moc_csspreprocessor.cpp",
+			null
+		],
+		[
 			"/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/htmlrenderer.h",
 			"MU",
 			"UVLADIE3JM/moc_htmlrenderer.cpp",
@@ -260,6 +266,11 @@
 	[
 		[
 			"/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/configmanager.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/csspreprocessor.cpp",
 			"MU",
 			null
 		],

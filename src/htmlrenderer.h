@@ -4,6 +4,8 @@
 #include <QString>
 #include <QUrl>
 
+class CssPreprocessor;
+
 class HtmlRenderer : public QTextBrowser
 {
     Q_OBJECT
@@ -24,4 +26,6 @@ private slots:
 
 private:
     QString extractTitle(const QString &html) const;
+
+    CssPreprocessor *m_css;
 };

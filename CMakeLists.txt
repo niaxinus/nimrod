@@ -15,6 +15,7 @@ set(SOURCES
     src/htmlrenderer.cpp
     src/configmanager.cpp
     src/networkmanager.cpp
+    src/csspreprocessor.cpp
 )
 
 set(HEADERS
@@ -22,6 +23,7 @@ set(HEADERS
     src/htmlrenderer.h
     src/configmanager.h
     src/networkmanager.h
+    src/csspreprocessor.h
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})

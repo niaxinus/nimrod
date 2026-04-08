@@ -6,6 +6,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/nimrod.dir/nimrod_autogen/mocs_compilation.cpp.o.d"
   "CMakeFiles/nimrod.dir/src/configmanager.cpp.o"
   "CMakeFiles/nimrod.dir/src/configmanager.cpp.o.d"
+  "CMakeFiles/nimrod.dir/src/csspreprocessor.cpp.o"
+  "CMakeFiles/nimrod.dir/src/csspreprocessor.cpp.o.d"
   "CMakeFiles/nimrod.dir/src/htmlrenderer.cpp.o"
   "CMakeFiles/nimrod.dir/src/htmlrenderer.cpp.o.d"
   "CMakeFiles/nimrod.dir/src/main.cpp.o"

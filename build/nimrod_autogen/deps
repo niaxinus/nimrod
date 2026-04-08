@@ -5,6 +5,8 @@ nimrod_autogen/timestamp: \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/build/nimrod_autogen/moc_predefs.h \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/configmanager.cpp \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/configmanager.h \
+	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/csspreprocessor.cpp \
+	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/csspreprocessor.h \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/htmlrenderer.cpp \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/htmlrenderer.h \
 	/home/nyufo/working-folder/github-cli-2/21-firefox-ihlette-webbongeszo/src/main.cpp \
@@ -299,6 +301,7 @@ nimrod_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QFlags \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QIODevice \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QList \
+	/usr/include/x86_64-linux-gnu/qt6/QtCore/QMap \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QMetaType \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QObject \
 	/usr/include/x86_64-linux-gnu/qt6/QtCore/QPoint \
