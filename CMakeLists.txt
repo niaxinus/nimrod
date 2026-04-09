@@ -12,6 +12,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets WebEngineWidgets Sql)
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
+    src/browsertab.cpp
     src/configmanager.cpp
     src/cookiestore.cpp
     src/jsconsole.cpp
@@ -20,6 +21,7 @@ set(SOURCES
 
 set(HEADERS
     src/mainwindow.h
+    src/browsertab.h
     src/configmanager.h
     src/cookiestore.h
     src/jsconsole.h

@@ -5,13 +5,13 @@
 
 class ConfigManager;
 class CookieStore;
-class JsConsole;
 class ScriptManager;
+class BrowserTab;
+class QTabWidget;
 class QLineEdit;
 class QProgressBar;
 class QAction;
 class QLabel;
-class QWebEngineView;
 class QWebEngineProfile;
 
 class MainWindow : public QMainWindow
@@ -24,6 +24,7 @@ public:
 
 public slots:
     void navigateTo(const QUrl &url);
+    BrowserTab *newTab(const QUrl &url = QUrl());
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -31,19 +32,18 @@ protected:
 
 private slots:
     void onUrlBarReturn();
-    void toggleDevTools();
-    void toggleJsConsole();
+    void closeTab(int index);
+    void onTabChanged(int index);
 
 private:
     void setupUi();
-    void setupConnections();
+    void connectTab(BrowserTab *tab, int index);
+    BrowserTab *currentTab() const;
 
-    QWebEngineView    *m_view;
+    QTabWidget        *m_tabWidget;
     QWebEngineProfile *m_profile;
-    QWebEngineView    *m_devToolsView = nullptr;
     ConfigManager     *m_config;
     CookieStore       *m_cookieStore;
-    JsConsole         *m_jsConsole;
     ScriptManager     *m_scriptManager;
 
     QLineEdit    *m_urlBar;
@@ -51,7 +51,6 @@ private:
     QAction      *m_forwardAction;
     QAction      *m_reloadAction;
     QAction      *m_stopAction;
-    QAction      *m_devToolsAction;
     QProgressBar *m_progressBar;
     QLabel       *m_statusLabel;
 };
