@@ -5,6 +5,13 @@
 #include <QMenu>
 #include <QToolButton>
 #include <QIcon>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QContextMenuEvent>
+#include <QMimeData>
+#include <QInputDialog>
+#include <QUrl>
 
 BookmarkToolBar::BookmarkToolBar(BookmarkStore *store, MainWindow *mainWindow, QWidget *parent)
     : QToolBar("Könyvjelzők", parent)
@@ -14,6 +21,7 @@ BookmarkToolBar::BookmarkToolBar(BookmarkStore *store, MainWindow *mainWindow, Q
     setMovable(false);
     setIconSize(QSize(16, 16));
     setStyleSheet("QToolBar { spacing: 2px; }");
+    setAcceptDrops(true);
     rebuild();
     connect(m_store, &BookmarkStore::changed, this, &BookmarkToolBar::rebuild);
 }
@@ -69,4 +77,100 @@ void BookmarkToolBar::rebuild()
     QAction *allAct = addAction("≡ Kezelés");
     allAct->setToolTip("Könyvjelzőkezelő (Ctrl+Shift+O)");
     connect(allAct, &QAction::triggered, m_mainWindow, &MainWindow::showBookmarkManager);
+}
+
+// ── Drag & Drop ─────────────────────────────────────────────────────────────
+
+void BookmarkToolBar::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (event->mimeData()->hasUrls() || event->mimeData()->hasText()) {
+        setStyleSheet("QToolBar { spacing: 2px; background: rgba(100,180,255,0.25); border: 1px dashed #4af; }");
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void BookmarkToolBar::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (event->mimeData()->hasUrls() || event->mimeData()->hasText())
+        event->acceptProposedAction();
+    else
+        event->ignore();
+}
+
+void BookmarkToolBar::dropEvent(QDropEvent *event)
+{
+    setStyleSheet("QToolBar { spacing: 2px; }");
+
+    QString url, title;
+
+    if (event->mimeData()->hasUrls()) {
+        url = event->mimeData()->urls().first().toString();
+        title = event->mimeData()->text();
+    } else if (event->mimeData()->hasText()) {
+        url = event->mimeData()->text();
+    }
+
+    if (url.isEmpty()) {
+        event->ignore();
+        return;
+    }
+
+    // Cím tisztítása: ha az URL-lel egyezik, hagyja üresen (store title-ként)
+    if (title == url) title.clear();
+
+    // Könyvjelző mentése az alap szintre (toolbar)
+    if (!m_store->hasUrl(url))
+        m_store->add(title.isEmpty() ? url : title, url, "");
+
+    event->acceptProposedAction();
+}
+
+void BookmarkToolBar::contextMenuEvent(QContextMenuEvent *event)
+{
+    QMenu menu(this);
+
+    QAction *actNewFolder = menu.addAction("📁 Új mappa...");
+    menu.addSeparator();
+    QAction *actNewBm = menu.addAction("🔖 Új könyvjelző...");
+    menu.addSeparator();
+    QAction *actMgr = menu.addAction("≡ Könyvjelzőkezelő...");
+
+    QAction *chosen = menu.exec(event->globalPos());
+    if (!chosen) return;
+
+    if (chosen == actNewFolder) {
+        bool ok = false;
+        QString folderName = QInputDialog::getText(this, "Új mappa",
+            "Mappa neve:", QLineEdit::Normal, "", &ok);
+        if (!ok || folderName.trimmed().isEmpty()) return;
+
+        // Mappa egy placeholder könyvjelzővel hozható létre
+        // (üres mappát az SQLite séma nem tud tárolni mappa-tábla nélkül)
+        // Ezért rögtön kérünk egy URL-t is
+        QString url = QInputDialog::getText(this, "Új mappa – első elem",
+            "URL a mappába (elhagyható, Enter = kihagyás):", QLineEdit::Normal, "https://", &ok);
+        if (ok && !url.trimmed().isEmpty() && url.trimmed() != "https://")
+            m_store->add(url, url, folderName.trimmed());
+        else
+            // Ha nincs URL: üres string-gel mentünk egy placeholder-t ami nem jelenik meg
+            // Helyette csak tájékoztatjuk a felhasználót
+            QInputDialog::getText(this, "Mappa létrehozása",
+                "A mappa akkor jelenik meg, ha van benne könyvjelző.\nHúzz rá egy lapot!",
+                QLineEdit::Normal, folderName.trimmed(), nullptr);
+
+    } else if (chosen == actNewBm) {
+        bool ok = false;
+        QString url = QInputDialog::getText(this, "Új könyvjelző",
+            "URL:", QLineEdit::Normal, "https://", &ok);
+        if (!ok || url.trimmed().isEmpty()) return;
+        QString title = QInputDialog::getText(this, "Új könyvjelző",
+            "Cím:", QLineEdit::Normal, url, &ok);
+        if (!ok) return;
+        m_store->add(title, url.trimmed(), "");
+
+    } else if (chosen == actMgr) {
+        m_mainWindow->showBookmarkManager();
+    }
 }

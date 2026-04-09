@@ -37,8 +37,62 @@
 #include <QLabel>
 #include <QCloseEvent>
 #include <QKeyEvent>
+#include <QMouseEvent>
+#include <QDrag>
+#include <QMimeData>
 #include <QStandardPaths>
 #include <QDir>
+
+// ── Drag-and-drop lap ikon (URL bar előtt) ────────────────────────────────
+// Kis 📄 ikon: egérgombbal húzva a bookmark toolbar-ra menti a lapot
+class PageDragLabel : public QLabel
+{
+public:
+    explicit PageDragLabel(QWidget *parent = nullptr) : QLabel(parent)
+    {
+        setText("📄");
+        setToolTip("Húzd a könyvjelzők sávra a mentéshez");
+        setFixedWidth(26);
+        setCursor(Qt::OpenHandCursor);
+        setStyleSheet("QLabel { font-size: 15px; padding: 0 2px; }");
+    }
+
+    void setPageInfo(const QString &url, const QString &title)
+    {
+        m_url   = url;
+        m_title = title;
+    }
+
+protected:
+    void mousePressEvent(QMouseEvent *e) override
+    {
+        if (e->button() == Qt::LeftButton)
+            m_dragStart = e->pos();
+        QLabel::mousePressEvent(e);
+    }
+
+    void mouseMoveEvent(QMouseEvent *e) override
+    {
+        if (!(e->buttons() & Qt::LeftButton)) return;
+        if ((e->pos() - m_dragStart).manhattanLength() < 6) return;
+        if (m_url.isEmpty()) return;
+
+        auto *drag = new QDrag(this);
+        auto *mime = new QMimeData;
+        mime->setUrls({QUrl(m_url)});
+        mime->setText(m_title.isEmpty() ? m_url : m_title);
+        drag->setMimeData(mime);
+        drag->setPixmap(QPixmap()); // nincs egyedi drag pixmap
+        setCursor(Qt::ClosedHandCursor);
+        drag->exec(Qt::CopyAction);
+        setCursor(Qt::OpenHandCursor);
+    }
+
+private:
+    QPoint  m_dragStart;
+    QString m_url;
+    QString m_title;
+};
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -163,6 +217,8 @@ void MainWindow::connectTab(BrowserTab *tab, int index)
             m_backAction->setEnabled(safeTab->canGoBack());
             m_forwardAction->setEnabled(safeTab->canGoForward());
             updateStarButton(url);
+            if (m_pageDragLabel)
+                m_pageDragLabel->setPageInfo(url.toString(), safeTab->title());
         }
     });
 
@@ -233,6 +289,8 @@ void MainWindow::onTabChanged(int index)
     m_progressBar->hide();
     m_statusLabel->setText("Kész.");
     updateStarButton(tab->url());
+    if (m_pageDragLabel)
+        m_pageDragLabel->setPageInfo(tab->url().toString(), tab->title());
 }
 
 BrowserTab *MainWindow::currentTab() const
@@ -402,6 +460,10 @@ void MainWindow::setupUi()
     m_reloadAction  = toolbar->addAction("↻");
     m_stopAction    = toolbar->addAction("✕");
     toolbar->addSeparator();
+
+    // 📄 Drag ikon – húzható a bookmark toolbar-ra
+    m_pageDragLabel = new PageDragLabel(this);
+    toolbar->addWidget(m_pageDragLabel);
 
     m_urlBar = new QLineEdit(this);
     m_urlBar->setPlaceholderText("URL vagy keresési kifejezés...");

@@ -17,6 +17,7 @@ class QToolButton;
 class QProgressBar;
 class QAction;
 class QLabel;
+class PageDragLabel;
 class QWebEngineProfile;
 class QMenu;
 
@@ -61,6 +62,7 @@ private:
     BookmarkToolBar   *m_bookmarkToolBar;
 
     QLineEdit    *m_urlBar;
+    PageDragLabel *m_pageDragLabel = nullptr;
     QToolButton  *m_starButton;
     QAction      *m_backAction;
     QAction      *m_forwardAction;
