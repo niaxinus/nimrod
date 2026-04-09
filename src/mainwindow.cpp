@@ -442,10 +442,10 @@ void MainWindow::setupUi()
         if (auto t = currentTab()) t->stop();
     });
 
-    // ── Könyvjelző toolbar (2. sor) ───────────────────────────────────────
+    // ── Könyvjelző toolbar (2. sor, tabfülek felett) ──────────────────────
+    addToolBarBreak(Qt::TopToolBarArea);
     m_bookmarkToolBar = new BookmarkToolBar(m_bookmarkStore, this, this);
     addToolBar(Qt::TopToolBarArea, m_bookmarkToolBar);
-    addToolBarBreak(Qt::TopToolBarArea);
 }
 
 // ── Könyvjelzők ────────────────────────────────────────────────────────────
