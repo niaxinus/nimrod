@@ -5,6 +5,8 @@
 #include "credentialstore.h"
 #include "nimrodbridge.h"
 #include "scriptmanager.h"
+#include "bookmarkstore.h"
+#include "bookmarktoolbar.h"
 
 #include <QPointer>
 
@@ -13,8 +15,14 @@
 #include <QMessageBox>
 #include <QDialog>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QTextBrowser>
 #include <QPushButton>
+#include <QToolButton>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
+#include <QInputDialog>
+#include <QMenu>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
 #include <QWebEnginePage>
@@ -80,6 +88,10 @@ MainWindow::MainWindow(QWidget *parent)
     m_credentialStore = new CredentialStore(this);
     m_credentialStore->init(configDir + "/credentials.db");
     m_bridge = new NimrodBridge(m_credentialStore, this);
+
+    // ── BookmarkStore ─────────────────────────────────────────────────────
+    m_bookmarkStore = new BookmarkStore(this);
+    m_bookmarkStore->init(configDir + "/bookmarks.db");
 
     // ── ScriptManager ──────────────────────────────────────────────────────
     m_scriptManager = new ScriptManager(this);
@@ -150,6 +162,7 @@ void MainWindow::connectTab(BrowserTab *tab, int index)
             m_config->setLastUrl(url.toString());
             m_backAction->setEnabled(safeTab->canGoBack());
             m_forwardAction->setEnabled(safeTab->canGoForward());
+            updateStarButton(url);
         }
     });
 
@@ -219,6 +232,7 @@ void MainWindow::onTabChanged(int index)
     setWindowTitle(tab->title().isEmpty() ? "Nimród Böngésző" : tab->title() + " – Nimród");
     m_progressBar->hide();
     m_statusLabel->setText("Kész.");
+    updateStarButton(tab->url());
 }
 
 BrowserTab *MainWindow::currentTab() const
@@ -314,14 +328,14 @@ void MainWindow::setupUi()
         if (auto t = currentTab()) t->showFindBar();
     });
 
-    // Help menü
+    // Help menü – billentyűkombinációk frissítve a könyvjelző shortcutokkal
     QMenu *helpMenu = mb->addMenu("&Súgó");
 
     QAction *actKeys = helpMenu->addAction("&Billentyűkombinációk");
     connect(actKeys, &QAction::triggered, this, [this]() {
         QDialog dlg(this);
         dlg.setWindowTitle("Billentyűkombinációk");
-        dlg.resize(420, 340);
+        dlg.resize(420, 380);
         auto *layout = new QVBoxLayout(&dlg);
         auto *tb = new QTextBrowser(&dlg);
         tb->setHtml(R"(
@@ -337,6 +351,8 @@ void MainWindow::setupUi()
 <tr><td>Ctrl+F</td><td>Keresés az oldalon</td></tr>
 <tr><td>Ctrl+J</td><td>JavaScript konzol</td></tr>
 <tr><td>F12</td><td>Fejlesztői eszközök</td></tr>
+<tr><td>Ctrl+D</td><td>Könyvjelző hozzáadása / eltávolítása</td></tr>
+<tr><td>Ctrl+Shift+O</td><td>Könyvjelzőkezelő</td></tr>
 <tr><td>Ctrl+Z</td><td>Visszavonás</td></tr>
 <tr><td>Ctrl+Y</td><td>Újra</td></tr>
 <tr><td>Ctrl+X</td><td>Kivágás</td></tr>
@@ -362,7 +378,14 @@ void MainWindow::setupUi()
             "<p>Copyright &copy; 2026 Komka László</p>");
     });
 
-    // ── Toolbar ──────────────────────────────────────────────────────────
+    // ── Könyvjelzők menü (dinamikus) ──────────────────────────────────────
+    m_bookmarkMenu = mb->addMenu("&Könyvjelzők");
+    setupBookmarkMenu();
+    connect(m_bookmarkStore, &BookmarkStore::changed, this, [this]() {
+        setupBookmarkMenu();
+    });
+
+    // ── Navigációs toolbar ────────────────────────────────────────────────
     QToolBar *toolbar = addToolBar("Navigáció");
     toolbar->setMovable(false);
 
@@ -384,6 +407,14 @@ void MainWindow::setupUi()
     m_urlBar->setPlaceholderText("URL vagy keresési kifejezés...");
     toolbar->addWidget(m_urlBar);
 
+    // ★ Csillag gomb – könyvjelző hozzáadása/eltávolítása
+    m_starButton = new QToolButton(this);
+    m_starButton->setText("☆");
+    m_starButton->setToolTip("Könyvjelző hozzáadása (Ctrl+D)");
+    m_starButton->setStyleSheet("QToolButton { font-size: 16px; border: none; padding: 2px 6px; }");
+    toolbar->addWidget(m_starButton);
+    connect(m_starButton, &QToolButton::clicked, this, &MainWindow::toggleBookmark);
+
     m_statusLabel = new QLabel("Kész.", this);
     m_progressBar = new QProgressBar(this);
     m_progressBar->setMaximumWidth(150);
@@ -397,7 +428,7 @@ void MainWindow::setupUi()
     m_forwardAction->setEnabled(false);
 
     // Toolbar gombok → aktív tab
-    connect(m_urlBar,       &QLineEdit::returnPressed, this, &MainWindow::onUrlBarReturn);
+    connect(m_urlBar,        &QLineEdit::returnPressed, this, &MainWindow::onUrlBarReturn);
     connect(m_backAction,    &QAction::triggered, this, [this]() {
         if (auto t = currentTab()) t->back();
     });
@@ -410,6 +441,206 @@ void MainWindow::setupUi()
     connect(m_stopAction,    &QAction::triggered, this, [this]() {
         if (auto t = currentTab()) t->stop();
     });
+
+    // ── Könyvjelző toolbar (2. sor) ───────────────────────────────────────
+    m_bookmarkToolBar = new BookmarkToolBar(m_bookmarkStore, this, this);
+    addToolBar(Qt::TopToolBarArea, m_bookmarkToolBar);
+    addToolBarBreak(Qt::TopToolBarArea);
+}
+
+// ── Könyvjelzők ────────────────────────────────────────────────────────────
+
+void MainWindow::setupBookmarkMenu()
+{
+    m_bookmarkMenu->clear();
+
+    QAction *actAdd = m_bookmarkMenu->addAction("★ &Könyvjelző hozzáadása");
+    actAdd->setShortcut(QKeySequence("Ctrl+D"));
+    connect(actAdd, &QAction::triggered, this, &MainWindow::toggleBookmark);
+
+    QAction *actMgr = m_bookmarkMenu->addAction("&Kezelő...");
+    actMgr->setShortcut(QKeySequence("Ctrl+Shift+O"));
+    connect(actMgr, &QAction::triggered, this, &MainWindow::showBookmarkManager);
+
+    m_bookmarkMenu->addSeparator();
+
+    // Alap szintű könyvjelzők
+    const QList<Bookmark> rootItems = m_bookmarkStore->inFolder("");
+    for (const Bookmark &bm : rootItems) {
+        QAction *act = m_bookmarkMenu->addAction("🔖 " + (bm.title.isEmpty() ? bm.url : bm.title));
+        act->setToolTip(bm.url);
+        const QString url = bm.url;
+        connect(act, &QAction::triggered, this, [this, url]() {
+            navigateTo(QUrl(url));
+        });
+    }
+
+    // Mappák almenüként
+    const QStringList folderList = m_bookmarkStore->folders();
+    for (const QString &folder : folderList) {
+        QMenu *sub = m_bookmarkMenu->addMenu("📁 " + folder);
+        const QList<Bookmark> items = m_bookmarkStore->inFolder(folder);
+        for (const Bookmark &bm : items) {
+            QAction *act = sub->addAction("🔖 " + (bm.title.isEmpty() ? bm.url : bm.title));
+            act->setToolTip(bm.url);
+            const QString url = bm.url;
+            connect(act, &QAction::triggered, this, [this, url]() {
+                navigateTo(QUrl(url));
+            });
+        }
+    }
+}
+
+void MainWindow::toggleBookmark()
+{
+    auto *tab = currentTab();
+    if (!tab) return;
+
+    QString url   = tab->url().toString();
+    QString title = tab->title();
+    if (url.isEmpty() || url == "about:blank") return;
+
+    if (m_bookmarkStore->hasUrl(url)) {
+        // Eltávolítás
+        Bookmark bm = m_bookmarkStore->byUrl(url);
+        m_bookmarkStore->remove(bm.id);
+        m_starButton->setText("☆");
+        m_starButton->setToolTip("Könyvjelző hozzáadása (Ctrl+D)");
+    } else {
+        // Mappa kérdése
+        QStringList choices;
+        choices << "(Könyvjelzők sáv)";
+        choices << m_bookmarkStore->folders();
+        choices << "[ Új mappa... ]";
+
+        bool ok = false;
+        QString chosen = QInputDialog::getItem(this, "Könyvjelző hozzáadása",
+            "Mappa:\n" + title + "\n" + url,
+            choices, 0, false, &ok);
+        if (!ok) return;
+
+        QString folder;
+        if (chosen == "[ Új mappa... ]") {
+            QString newFolder = QInputDialog::getText(this, "Új mappa", "Mappa neve:", QLineEdit::Normal, "", &ok);
+            if (!ok || newFolder.isEmpty()) return;
+            folder = newFolder;
+        } else if (chosen != "(Könyvjelzők sáv)") {
+            folder = chosen;
+        }
+
+        m_bookmarkStore->add(title, url, folder);
+        m_starButton->setText("★");
+        m_starButton->setToolTip("Könyvjelző eltávolítása (Ctrl+D)");
+    }
+}
+
+void MainWindow::updateStarButton(const QUrl &url)
+{
+    if (m_bookmarkStore->hasUrl(url.toString())) {
+        m_starButton->setText("★");
+        m_starButton->setStyleSheet("QToolButton { font-size: 16px; border: none; padding: 2px 6px; color: gold; }");
+        m_starButton->setToolTip("Könyvjelző eltávolítása (Ctrl+D)");
+    } else {
+        m_starButton->setText("☆");
+        m_starButton->setStyleSheet("QToolButton { font-size: 16px; border: none; padding: 2px 6px; }");
+        m_starButton->setToolTip("Könyvjelző hozzáadása (Ctrl+D)");
+    }
+}
+
+void MainWindow::showBookmarkManager()
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle("Könyvjelzőkezelő");
+    dlg.resize(600, 450);
+
+    auto *layout = new QVBoxLayout(&dlg);
+
+    QTreeWidget *tree = new QTreeWidget(&dlg);
+    tree->setHeaderLabels({"Cím", "URL", "Mappa"});
+    tree->setColumnWidth(0, 200);
+    tree->setColumnWidth(1, 280);
+
+    auto rebuildTree = [&]() {
+        tree->clear();
+        // Gyökér elem
+        QTreeWidgetItem *rootItem = new QTreeWidgetItem(tree, {"(Könyvjelzők sáv)", "", ""});
+        rootItem->setData(0, Qt::UserRole, -1);
+        for (const Bookmark &bm : m_bookmarkStore->inFolder("")) {
+            auto *item = new QTreeWidgetItem(rootItem, {bm.title, bm.url, ""});
+            item->setData(0, Qt::UserRole, bm.id);
+        }
+        rootItem->setExpanded(true);
+
+        for (const QString &folder : m_bookmarkStore->folders()) {
+            QTreeWidgetItem *folderItem = new QTreeWidgetItem(tree, {"📁 " + folder, "", folder});
+            folderItem->setData(0, Qt::UserRole, -2);
+            for (const Bookmark &bm : m_bookmarkStore->inFolder(folder)) {
+                auto *item = new QTreeWidgetItem(folderItem, {bm.title, bm.url, folder});
+                item->setData(0, Qt::UserRole, bm.id);
+            }
+            folderItem->setExpanded(true);
+        }
+    };
+    rebuildTree();
+    layout->addWidget(tree);
+
+    // Gombok
+    auto *btnLayout = new QHBoxLayout;
+
+    auto *btnOpen = new QPushButton("Megnyitás", &dlg);
+    auto *btnEdit = new QPushButton("Átnevezés", &dlg);
+    auto *btnDel  = new QPushButton("Törlés",    &dlg);
+    auto *btnClose = new QPushButton("Bezárás",  &dlg);
+
+    btnLayout->addWidget(btnOpen);
+    btnLayout->addWidget(btnEdit);
+    btnLayout->addWidget(btnDel);
+    btnLayout->addStretch();
+    btnLayout->addWidget(btnClose);
+    layout->addLayout(btnLayout);
+
+    connect(btnOpen, &QPushButton::clicked, this, [&]() {
+        auto *item = tree->currentItem();
+        if (!item) return;
+        int id = item->data(0, Qt::UserRole).toInt();
+        if (id <= 0) return;
+        QString url = item->text(1);
+        navigateTo(QUrl(url));
+    });
+
+    connect(btnEdit, &QPushButton::clicked, this, [&]() {
+        auto *item = tree->currentItem();
+        if (!item) return;
+        int id = item->data(0, Qt::UserRole).toInt();
+        if (id <= 0) return;
+        bool ok = false;
+        QString newTitle = QInputDialog::getText(&dlg, "Átnevezés", "Új cím:", QLineEdit::Normal, item->text(0), &ok);
+        if (!ok || newTitle.isEmpty()) return;
+        m_bookmarkStore->update(id, newTitle, item->text(1), item->text(2));
+        rebuildTree();
+    });
+
+    connect(btnDel, &QPushButton::clicked, this, [&]() {
+        auto *item = tree->currentItem();
+        if (!item) return;
+        int id = item->data(0, Qt::UserRole).toInt();
+        if (id <= 0) return;
+        auto res = QMessageBox::question(&dlg, "Törlés", "Törlöd a könyvjelzőt?\n" + item->text(0));
+        if (res != QMessageBox::Yes) return;
+        m_bookmarkStore->remove(id);
+        rebuildTree();
+    });
+
+    connect(btnClose, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    // Dupla kattintás = megnyitás
+    connect(tree, &QTreeWidget::itemDoubleClicked, this, [&](QTreeWidgetItem *item) {
+        int id = item->data(0, Qt::UserRole).toInt();
+        if (id <= 0) return;
+        navigateTo(QUrl(item->text(1)));
+    });
+
+    dlg.exec();
 }
 
 // ── Billentyűk ─────────────────────────────────────────────────────────────
@@ -443,6 +674,14 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
     }
     if (key == Qt::Key_J && mod == Qt::ControlModifier) {
         if (auto t = currentTab()) t->toggleJsConsole();
+        return;
+    }
+    if (key == Qt::Key_D && mod == Qt::ControlModifier) {
+        toggleBookmark();
+        return;
+    }
+    if (key == Qt::Key_O && mod == (Qt::ControlModifier | Qt::ShiftModifier)) {
+        showBookmarkManager();
         return;
     }
 

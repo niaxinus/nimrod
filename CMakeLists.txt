@@ -21,6 +21,8 @@ set(SOURCES
     src/cookiestore.cpp
     src/credentialstore.cpp
     src/nimrodbridge.cpp
+    src/bookmarkstore.cpp
+    src/bookmarktoolbar.cpp
     src/jsconsole.cpp
     src/scriptmanager.cpp
 )
@@ -32,6 +34,8 @@ set(HEADERS
     src/cookiestore.h
     src/credentialstore.h
     src/nimrodbridge.h
+    src/bookmarkstore.h
+    src/bookmarktoolbar.h
     src/jsconsole.h
     src/scriptmanager.h
 )
