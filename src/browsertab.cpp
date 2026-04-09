@@ -1,19 +1,34 @@
 #include "browsertab.h"
 #include "jsconsole.h"
+#include "nimrodbridge.h"
 
 #include <QWebEngineView>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineHistory>
+#include <QWebEngineScript>
+#include <QWebEngineScriptCollection>
+#include <QWebChannel>
 #include <QVBoxLayout>
 #include <QMenu>
+#include <QFile>
+#include <QTextStream>
+#include <QCoreApplication>
 
-BrowserTab::BrowserTab(QWebEngineProfile *profile, QWidget *parent)
+BrowserTab::BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget *parent)
     : QWidget(parent)
 {
     QWebEnginePage *page = new QWebEnginePage(profile, this);
     m_view = new QWebEngineView(this);
     m_view->setPage(page);
+
+    // ── QWebChannel – bridge JS ↔ C++ ─────────────────────────────────────
+    m_channel = new QWebChannel(this);
+    m_channel->registerObject("nimrodBridge", bridge);
+    page->setWebChannel(m_channel);
+
+    // Autofill script injektálása
+    injectAutofillScript();
 
     m_jsConsole = new JsConsole(this);
     m_jsConsole->setPage(page);
@@ -110,6 +125,43 @@ void BrowserTab::toggleJsConsole()
 {
     m_jsConsole->setPage(m_view->page());
     m_jsConsole->isVisible() ? m_jsConsole->hide() : m_jsConsole->show();
+}
+
+void BrowserTab::injectAutofillScript()
+{
+    // 1) qwebchannel.js – Qt WebEngine beépített QRC forrásból
+    QWebEngineScript wcScript;
+    wcScript.setName("nimrod_qwebchannel");
+    wcScript.setSourceUrl(QUrl("qrc:///qtwebchannel/qwebchannel.js"));
+    wcScript.setInjectionPoint(QWebEngineScript::DocumentCreation);
+    wcScript.setWorldId(QWebEngineScript::MainWorld);
+    wcScript.setRunsOnSubFrames(false);
+    m_view->page()->scripts().insert(wcScript);
+
+    // 2) autofill.js – resources/autofill.js beolvasása
+    QString autofillPath = QCoreApplication::applicationDirPath() + "/../resources/autofill.js";
+    QFile f(autofillPath);
+    if (!f.exists()) {
+        // Próbáljuk a forrásmappából is
+        autofillPath = QString(NIMROD_RESOURCES_DIR) + "/autofill.js";
+        f.setFileName(autofillPath);
+    }
+
+    QString autofillCode;
+    if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        autofillCode = QTextStream(&f).readAll();
+    } else {
+        qWarning() << "BrowserTab: autofill.js nem található:" << autofillPath;
+        return;
+    }
+
+    QWebEngineScript afScript;
+    afScript.setName("nimrod_autofill");
+    afScript.setSourceCode(autofillCode);
+    afScript.setInjectionPoint(QWebEngineScript::DocumentReady);
+    afScript.setWorldId(QWebEngineScript::MainWorld);
+    afScript.setRunsOnSubFrames(false);
+    m_view->page()->scripts().insert(afScript);
 }
 
 void BrowserTab::setupConnections()

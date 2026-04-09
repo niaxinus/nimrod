@@ -5,6 +5,8 @@
 
 class ConfigManager;
 class CookieStore;
+class CredentialStore;
+class NimrodBridge;
 class ScriptManager;
 class BrowserTab;
 class QTabWidget;
@@ -44,6 +46,8 @@ private:
     QWebEngineProfile *m_profile;
     ConfigManager     *m_config;
     CookieStore       *m_cookieStore;
+    CredentialStore   *m_credentialStore;
+    NimrodBridge      *m_bridge;
     ScriptManager     *m_scriptManager;
 
     QLineEdit    *m_urlBar;

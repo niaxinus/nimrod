@@ -5,16 +5,16 @@
 
 class QWebEngineView;
 class QWebEngineProfile;
-class QWebEngineView;
 class JsConsole;
-class QDockWidget;
+class NimrodBridge;
+class QWebChannel;
 
 class BrowserTab : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit BrowserTab(QWebEngineProfile *profile, QWidget *parent = nullptr);
+    explicit BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget *parent = nullptr);
     ~BrowserTab();
 
     QWebEngineView *view() const { return m_view; }
@@ -31,7 +31,6 @@ public:
     bool canGoBack() const;
     bool canGoForward() const;
 
-    // Biztonságos törlés előkészítés: leállítja a betöltést, disconnecteli a page signalokat
     void prepareClose();
 
     void toggleDevTools();
@@ -48,8 +47,10 @@ signals:
 
 private:
     void setupConnections();
+    void injectAutofillScript();
 
     QWebEngineView *m_view;
     JsConsole      *m_jsConsole;
     QWebEngineView *m_devToolsView = nullptr;
+    QWebChannel    *m_channel      = nullptr;
 };

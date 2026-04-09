@@ -2,6 +2,8 @@
 #include "browsertab.h"
 #include "configmanager.h"
 #include "cookiestore.h"
+#include "credentialstore.h"
+#include "nimrodbridge.h"
 #include "scriptmanager.h"
 
 #include <QPointer>
@@ -66,6 +68,11 @@ MainWindow::MainWindow(QWidget *parent)
         m_cookieStore->connectTo(m_profile->cookieStore());
     }
 
+    // ── CredentialStore + NimrodBridge ────────────────────────────────────
+    m_credentialStore = new CredentialStore(this);
+    m_credentialStore->init(configDir + "/credentials.db");
+    m_bridge = new NimrodBridge(m_credentialStore, this);
+
     // ── ScriptManager ──────────────────────────────────────────────────────
     m_scriptManager = new ScriptManager(this);
     m_scriptManager->init(m_profile, configDir + "/userscripts");
@@ -96,7 +103,7 @@ MainWindow::~MainWindow() {}
 
 BrowserTab *MainWindow::newTab(const QUrl &url)
 {
-    BrowserTab *tab = new BrowserTab(m_profile, m_tabWidget);
+    BrowserTab *tab = new BrowserTab(m_profile, m_bridge, m_tabWidget);
     int idx = m_tabWidget->addTab(tab, "Új tab");
     m_tabWidget->setCurrentIndex(idx);
     connectTab(tab, idx);
