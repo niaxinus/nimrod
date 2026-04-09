@@ -11,13 +11,29 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 
+#include <pwd.h>
+#include <unistd.h>
+
 static const int AES_KEY_LEN = 32; // AES-256
 static const int AES_IV_LEN  = 16; // CBC IV
 
-// SHA-256(username) → 32 bájtos kulcs
-static QByteArray deriveKey(const QString &username)
+// Linux rendszer username lekérése (getpwuid biztonságosabb mint $USER)
+static QString linuxUsername()
 {
-    QByteArray input = username.toUtf8();
+    struct passwd *pw = getpwuid(getuid());
+    if (pw && pw->pw_name)
+        return QString::fromLocal8Bit(pw->pw_name);
+    // fallback: $USER env változó
+    QByteArray user = qgetenv("USER");
+    if (!user.isEmpty())
+        return QString::fromLocal8Bit(user);
+    return QStringLiteral("nimrod");
+}
+
+// SHA-256(linux_username) → 32 bájtos AES kulcs
+static QByteArray deriveKey()
+{
+    QByteArray input = linuxUsername().toUtf8();
     QByteArray result(SHA256_DIGEST_LENGTH, '\0');
     SHA256(reinterpret_cast<const unsigned char*>(input.constData()),
            static_cast<size_t>(input.size()),
@@ -72,7 +88,7 @@ void CredentialStore::store(const QString &domain, const QString &username, cons
 {
     if (domain.isEmpty() || username.isEmpty()) return;
 
-    QString enc = encrypt(password, username);
+    QString enc = encrypt(password);
     if (enc.isEmpty()) {
         qWarning() << "CredentialStore: titkosítás sikertelen";
         return;
@@ -108,7 +124,7 @@ QList<Credential> CredentialStore::findForDomain(const QString &domain) const
     while (q.next()) {
         QString username = q.value(0).toString();
         QString enc      = q.value(1).toString();
-        QString password = decrypt(enc, username);
+        QString password = decrypt(enc);
         result.append({username, password});
     }
     return result;
@@ -126,9 +142,9 @@ void CredentialStore::remove(const QString &domain, const QString &username)
 
 // ── AES-256-CBC titkosítás ─────────────────────────────────────────────────
 
-QString CredentialStore::encrypt(const QString &plaintext, const QString &key)
+QString CredentialStore::encrypt(const QString &plaintext)
 {
-    QByteArray keyBytes = deriveKey(key);  // SHA-256(username) = 32 bájt
+    QByteArray keyBytes = deriveKey();  // SHA-256(linux_username)
     QByteArray iv(AES_IV_LEN, '\0');
     if (RAND_bytes(reinterpret_cast<unsigned char*>(iv.data()), AES_IV_LEN) != 1)
         return {};
@@ -165,9 +181,9 @@ QString CredentialStore::encrypt(const QString &plaintext, const QString &key)
     return QString::fromLatin1((iv + output).toBase64());
 }
 
-QString CredentialStore::decrypt(const QString &base64Cipher, const QString &key)
+QString CredentialStore::decrypt(const QString &base64Cipher)
 {
-    QByteArray keyBytes = deriveKey(key);
+    QByteArray keyBytes = deriveKey();
     QByteArray raw = QByteArray::fromBase64(base64Cipher.toLatin1());
 
     if (raw.size() < AES_IV_LEN) return {};

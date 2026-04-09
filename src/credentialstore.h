@@ -19,7 +19,7 @@ public:
 
     bool init(const QString &dbPath);
 
-    // Menti vagy frissíti a credential-t (password AES-sel titkosítva, kulcs = username)
+    // Menti vagy frissíti a credential-t (password AES-sel titkosítva, kulcs = linux_username)
     void store(const QString &domain, const QString &username, const QString &password);
 
     // Visszaadja a domain-hez tárolt összes credential-t (jelszó visszafejtve)
@@ -32,10 +32,10 @@ private:
     void createSchema();
 
     // AES-256-CBC titkosítás/visszafejtés (OpenSSL EVP)
-    // Kulcs: SHA-256(username), IV: véletlenszerű 16 bájt
+    // Kulcs: SHA-256(linux_username), IV: véletlenszerű 16 bájt
     // Kimenet: base64(iv[16] + ciphertext)
-    static QString encrypt(const QString &plaintext, const QString &key);
-    static QString decrypt(const QString &base64Cipher, const QString &key);
+    static QString encrypt(const QString &plaintext);
+    static QString decrypt(const QString &base64Cipher);
 
     QString m_connectionName;
     QString m_dbPath;
