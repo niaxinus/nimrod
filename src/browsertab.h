@@ -5,6 +5,7 @@
 
 class QWebEngineView;
 class QWebEngineProfile;
+class QWebEnginePage;
 class JsConsole;
 class NimrodBridge;
 class QWebChannel;
@@ -19,6 +20,7 @@ public:
 
     QWebEngineView *view() const { return m_view; }
     JsConsole      *jsConsole() const { return m_jsConsole; }
+    QWebEnginePage *page() const;
 
     void load(const QUrl &url);
     QUrl url() const;
@@ -35,6 +37,7 @@ public:
 
     void toggleDevTools();
     void toggleJsConsole();
+    void showFindBar();
 
 signals:
     void titleChanged(const QString &title);
@@ -53,4 +56,5 @@ private:
     JsConsole      *m_jsConsole;
     QWebEngineView *m_devToolsView = nullptr;
     QWebChannel    *m_channel      = nullptr;
+    QWidget        *m_findBar      = nullptr;
 };

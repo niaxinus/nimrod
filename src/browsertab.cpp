@@ -10,6 +10,10 @@
 #include <QWebEngineScriptCollection>
 #include <QWebChannel>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QLabel>
 #include <QMenu>
 #include <QFile>
 #include <QTextStream>
@@ -172,4 +176,61 @@ void BrowserTab::setupConnections()
     connect(m_view, &QWebEngineView::loadProgress, this, &BrowserTab::loadProgress);
     connect(m_view, &QWebEngineView::loadFinished, this, &BrowserTab::loadFinished);
     connect(m_view->page(), &QWebEnginePage::linkHovered, this, &BrowserTab::linkHovered);
+}
+
+QWebEnginePage *BrowserTab::page() const
+{
+    return m_view->page();
+}
+
+void BrowserTab::showFindBar()
+{
+    if (!m_findBar) {
+        // Kereső sáv létrehozása a tab aljára
+        auto *layout = qobject_cast<QVBoxLayout*>(this->layout());
+        if (!layout) return;
+
+        m_findBar = new QWidget(this);
+        auto *hbox = new QHBoxLayout(m_findBar);
+        hbox->setContentsMargins(4, 2, 4, 2);
+
+        auto *label = new QLabel("Keresés:", m_findBar);
+        auto *input = new QLineEdit(m_findBar);
+        input->setPlaceholderText("Keresési kifejezés...");
+        auto *btnNext = new QPushButton("▼", m_findBar);
+        auto *btnPrev = new QPushButton("▲", m_findBar);
+        auto *btnClose = new QPushButton("✕", m_findBar);
+        btnNext->setMaximumWidth(30);
+        btnPrev->setMaximumWidth(30);
+        btnClose->setMaximumWidth(30);
+
+        hbox->addWidget(label);
+        hbox->addWidget(input);
+        hbox->addWidget(btnPrev);
+        hbox->addWidget(btnNext);
+        hbox->addWidget(btnClose);
+        layout->addWidget(m_findBar);
+
+        connect(input, &QLineEdit::textChanged, this, [this, input]() {
+            m_view->findText(input->text());
+        });
+        connect(input, &QLineEdit::returnPressed, this, [this, input]() {
+            m_view->findText(input->text());
+        });
+        connect(btnNext, &QPushButton::clicked, this, [this, input]() {
+            m_view->findText(input->text());
+        });
+        connect(btnPrev, &QPushButton::clicked, this, [this, input]() {
+            m_view->findText(input->text(), QWebEnginePage::FindBackward);
+        });
+        connect(btnClose, &QPushButton::clicked, this, [this]() {
+            m_view->findText({}); // töröl
+            m_findBar->hide();
+        });
+    }
+
+    m_findBar->show();
+    // Focus az input mezőre
+    if (auto *input = m_findBar->findChild<QLineEdit*>())
+        input->setFocus();
 }

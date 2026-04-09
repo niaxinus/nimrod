@@ -8,8 +8,16 @@
 
 #include <QPointer>
 
+#include <QMenuBar>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QTextBrowser>
+#include <QPushButton>
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
+#include <QWebEnginePage>
 #include <QWebEngineCookieStore>
 #include <QTabWidget>
 #include <QTabBar>
@@ -243,6 +251,118 @@ void MainWindow::setupUi()
 {
     setWindowTitle("Nimród Böngésző");
 
+    // ── Menüsor ───────────────────────────────────────────────────────────
+    QMenuBar *mb = menuBar();
+
+    // File menü
+    QMenu *fileMenu = mb->addMenu("&Fájl");
+    QAction *actNewTab = fileMenu->addAction("&Új tab");
+    actNewTab->setShortcut(QKeySequence("Ctrl+T"));
+    connect(actNewTab, &QAction::triggered, this, [this]() {
+        newTab(QUrl("https://www.google.com"));
+    });
+
+    QAction *actOpen = fileMenu->addAction("&Megnyitás...");
+    actOpen->setShortcut(QKeySequence("Ctrl+O"));
+    connect(actOpen, &QAction::triggered, this, [this]() {
+        QString path = QFileDialog::getOpenFileName(this, "Fájl megnyitása", {},
+            "Weboldalak (*.html *.htm *.xhtml);;Minden fájl (*)");
+        if (!path.isEmpty())
+            newTab(QUrl::fromLocalFile(path));
+    });
+
+    fileMenu->addSeparator();
+
+    QAction *actClose = fileMenu->addAction("Tab &bezárása");
+    actClose->setShortcut(QKeySequence("Ctrl+W"));
+    connect(actClose, &QAction::triggered, this, [this]() {
+        closeTab(m_tabWidget->currentIndex());
+    });
+
+    fileMenu->addSeparator();
+
+    QAction *actQuit = fileMenu->addAction("&Kilépés");
+    actQuit->setShortcut(QKeySequence("Ctrl+Q"));
+    connect(actQuit, &QAction::triggered, this, &MainWindow::close);
+
+    // Edit menü
+    QMenu *editMenu = mb->addMenu("&Szerkesztés");
+    auto addEditAction = [&](const QString &label, const char *slot, const QKeySequence &sc) {
+        QAction *a = editMenu->addAction(label);
+        a->setShortcut(sc);
+        connect(a, &QAction::triggered, this, [this, slot]() {
+            if (auto t = currentTab())
+                t->page()->triggerAction(
+                    strcmp(slot, "undo")  == 0 ? QWebEnginePage::Undo  :
+                    strcmp(slot, "redo")  == 0 ? QWebEnginePage::Redo  :
+                    strcmp(slot, "cut")   == 0 ? QWebEnginePage::Cut   :
+                    strcmp(slot, "copy")  == 0 ? QWebEnginePage::Copy  :
+                    strcmp(slot, "paste") == 0 ? QWebEnginePage::Paste :
+                    QWebEnginePage::SelectAll);
+        });
+    };
+    addEditAction("&Visszavonás",   "undo",  QKeySequence("Ctrl+Z"));
+    addEditAction("&Újra",          "redo",  QKeySequence("Ctrl+Y"));
+    editMenu->addSeparator();
+    addEditAction("Ki&vágás",       "cut",   QKeySequence("Ctrl+X"));
+    addEditAction("&Másolás",       "copy",  QKeySequence("Ctrl+C"));
+    addEditAction("&Beillesztés",   "paste", QKeySequence("Ctrl+V"));
+    editMenu->addSeparator();
+    QAction *actFind = editMenu->addAction("&Keresés az oldalon...");
+    actFind->setShortcut(QKeySequence("Ctrl+F"));
+    connect(actFind, &QAction::triggered, this, [this]() {
+        if (auto t = currentTab()) t->showFindBar();
+    });
+
+    // Help menü
+    QMenu *helpMenu = mb->addMenu("&Súgó");
+
+    QAction *actKeys = helpMenu->addAction("&Billentyűkombinációk");
+    connect(actKeys, &QAction::triggered, this, [this]() {
+        QDialog dlg(this);
+        dlg.setWindowTitle("Billentyűkombinációk");
+        dlg.resize(420, 340);
+        auto *layout = new QVBoxLayout(&dlg);
+        auto *tb = new QTextBrowser(&dlg);
+        tb->setHtml(R"(
+<h3>Billentyűkombinációk</h3>
+<table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
+<tr><th>Billentyű</th><th>Funkció</th></tr>
+<tr><td>Ctrl+T</td><td>Új tab</td></tr>
+<tr><td>Ctrl+O</td><td>Fájl megnyitása</td></tr>
+<tr><td>Ctrl+W</td><td>Tab bezárása</td></tr>
+<tr><td>Ctrl+Q</td><td>Kilépés</td></tr>
+<tr><td>Ctrl+Tab</td><td>Következő tab</td></tr>
+<tr><td>Ctrl+Shift+Tab</td><td>Előző tab</td></tr>
+<tr><td>Ctrl+F</td><td>Keresés az oldalon</td></tr>
+<tr><td>Ctrl+J</td><td>JavaScript konzol</td></tr>
+<tr><td>F12</td><td>Fejlesztői eszközök</td></tr>
+<tr><td>Ctrl+Z</td><td>Visszavonás</td></tr>
+<tr><td>Ctrl+Y</td><td>Újra</td></tr>
+<tr><td>Ctrl+X</td><td>Kivágás</td></tr>
+<tr><td>Ctrl+C</td><td>Másolás</td></tr>
+<tr><td>Ctrl+V</td><td>Beillesztés</td></tr>
+</table>
+)");
+        layout->addWidget(tb);
+        auto *btn = new QPushButton("Bezárás", &dlg);
+        connect(btn, &QPushButton::clicked, &dlg, &QDialog::accept);
+        layout->addWidget(btn);
+        dlg.exec();
+    });
+
+    helpMenu->addSeparator();
+
+    QAction *actAbout = helpMenu->addAction("&Névjegy");
+    connect(actAbout, &QAction::triggered, this, [this]() {
+        QMessageBox::about(this, "Névjegy – Nimród Böngésző",
+            "<h2>Nimród Böngésző</h2>"
+            "<p><b>⚠ Csak kísérleti projekt – nem így kell böngészőt fejleszteni!</b></p>"
+            "<p>Qt6 WebEngine alapú minimális böngésző.</p>"
+            "<p>Copyright &copy; 2026 Komka László</p>");
+    });
+
+    // ── Toolbar ──────────────────────────────────────────────────────────
     QToolBar *toolbar = addToolBar("Navigáció");
     toolbar->setMovable(false);
 
