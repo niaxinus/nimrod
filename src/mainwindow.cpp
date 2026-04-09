@@ -4,6 +4,8 @@
 #include "cookiestore.h"
 #include "scriptmanager.h"
 
+#include <QPointer>
+
 #include <QWebEngineProfile>
 #include <QWebEngineSettings>
 #include <QWebEngineCookieStore>
@@ -111,30 +113,34 @@ BrowserTab *MainWindow::newTab(const QUrl &url)
 
 void MainWindow::connectTab(BrowserTab *tab, int index)
 {
-    // titleChanged → tab felirat frissítése
-    connect(tab, &BrowserTab::titleChanged, this, [this, tab](const QString &title) {
-        int idx = m_tabWidget->indexOf(tab);
+    // QPointer: ha a tab törlődik, a pointer null lesz → nincs use-after-free
+    QPointer<BrowserTab> safeTab(tab);
+
+    connect(tab, &BrowserTab::titleChanged, this, [this, safeTab](const QString &title) {
+        if (!safeTab) return;
+        int idx = m_tabWidget->indexOf(safeTab);
         if (idx >= 0) {
             QString label = title.isEmpty() ? "Új tab" : title;
             if (label.length() > 30) label = label.left(28) + "…";
             m_tabWidget->setTabText(idx, label);
         }
-        // Ha aktív tab: ablakcím frissítése
-        if (m_tabWidget->currentWidget() == tab)
+        if (m_tabWidget->currentWidget() == safeTab)
             setWindowTitle(title.isEmpty() ? "Nimród Böngésző" : title + " – Nimród");
     });
 
-    connect(tab, &BrowserTab::urlChanged, this, [this, tab](const QUrl &url) {
-        if (m_tabWidget->currentWidget() == tab) {
+    connect(tab, &BrowserTab::urlChanged, this, [this, safeTab](const QUrl &url) {
+        if (!safeTab) return;
+        if (m_tabWidget->currentWidget() == safeTab) {
             m_urlBar->setText(url.toString());
             m_config->setLastUrl(url.toString());
-            m_backAction->setEnabled(tab->canGoBack());
-            m_forwardAction->setEnabled(tab->canGoForward());
+            m_backAction->setEnabled(safeTab->canGoBack());
+            m_forwardAction->setEnabled(safeTab->canGoForward());
         }
     });
 
-    connect(tab, &BrowserTab::loadStarted, this, [this, tab]() {
-        if (m_tabWidget->currentWidget() == tab) {
+    connect(tab, &BrowserTab::loadStarted, this, [this, safeTab]() {
+        if (!safeTab) return;
+        if (m_tabWidget->currentWidget() == safeTab) {
             m_progressBar->setValue(0);
             m_progressBar->show();
             m_statusLabel->setText("Betöltés...");
@@ -143,24 +149,27 @@ void MainWindow::connectTab(BrowserTab *tab, int index)
         }
     });
 
-    connect(tab, &BrowserTab::loadProgress, this, [this, tab](int p) {
-        if (m_tabWidget->currentWidget() == tab)
+    connect(tab, &BrowserTab::loadProgress, this, [this, safeTab](int p) {
+        if (!safeTab) return;
+        if (m_tabWidget->currentWidget() == safeTab)
             m_progressBar->setValue(p);
     });
 
-    connect(tab, &BrowserTab::loadFinished, this, [this, tab](bool ok) {
-        if (m_tabWidget->currentWidget() == tab) {
+    connect(tab, &BrowserTab::loadFinished, this, [this, safeTab](bool ok) {
+        if (!safeTab) return;
+        if (m_tabWidget->currentWidget() == safeTab) {
             m_progressBar->hide();
             m_statusLabel->setText(ok ? "Kész." : "Betöltési hiba.");
             m_stopAction->setEnabled(false);
             m_reloadAction->setEnabled(true);
-            m_backAction->setEnabled(tab->canGoBack());
-            m_forwardAction->setEnabled(tab->canGoForward());
+            m_backAction->setEnabled(safeTab->canGoBack());
+            m_forwardAction->setEnabled(safeTab->canGoForward());
         }
     });
 
-    connect(tab, &BrowserTab::linkHovered, this, [this, tab](const QString &url) {
-        if (m_tabWidget->currentWidget() == tab)
+    connect(tab, &BrowserTab::linkHovered, this, [this, safeTab](const QString &url) {
+        if (!safeTab) return;
+        if (m_tabWidget->currentWidget() == safeTab)
             m_statusLabel->setText(url.isEmpty() ? "Kész." : url);
     });
 
@@ -170,9 +179,18 @@ void MainWindow::connectTab(BrowserTab *tab, int index)
 void MainWindow::closeTab(int index)
 {
     if (m_tabWidget->count() <= 1) return; // legalább 1 tab marad
-    QWidget *w = m_tabWidget->widget(index);
+
+    BrowserTab *tab = qobject_cast<BrowserTab*>(m_tabWidget->widget(index));
+    if (tab) {
+        // Explicit disconnect: megakadályozza, hogy async WebEngine signalok
+        // a törlés után tüzeljenek és use-after-free-t okozzanak
+        disconnect(tab, nullptr, this, nullptr);
+        tab->prepareClose();
+    }
+
     m_tabWidget->removeTab(index);
-    w->deleteLater();
+    if (tab)
+        tab->deleteLater();
 }
 
 void MainWindow::onTabChanged(int index)

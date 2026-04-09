@@ -76,6 +76,19 @@ void BrowserTab::stop()    { m_view->stop(); }
 bool BrowserTab::canGoBack()    const { return m_view->history()->canGoBack(); }
 bool BrowserTab::canGoForward() const { return m_view->history()->canGoForward(); }
 
+void BrowserTab::prepareClose()
+{
+    // Leállítja a betöltést
+    m_view->stop();
+    // Leválasztja az összes signal kapcsolatot a page-ről és a view-ról
+    // hogy az async WebEngine callbackek ne tüzeljenek törlés után
+    disconnect(m_view, nullptr, this, nullptr);
+    if (m_view->page())
+        disconnect(m_view->page(), nullptr, this, nullptr);
+    // Üres lapra navigál → megszakítja a hálózati kéréseket
+    m_view->setPage(nullptr);
+}
+
 void BrowserTab::toggleDevTools()
 {
     if (!m_devToolsView) {

@@ -31,6 +31,9 @@ public:
     bool canGoBack() const;
     bool canGoForward() const;
 
+    // Biztonságos törlés előkészítés: leállítja a betöltést, disconnecteli a page signalokat
+    void prepareClose();
+
     void toggleDevTools();
     void toggleJsConsole();
 
