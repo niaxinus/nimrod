@@ -14,6 +14,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QWebEngineContextMenuRequest>
 #include <QMenu>
 #include <QFile>
 #include <QTextStream>
@@ -48,12 +49,23 @@ BrowserTab::BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget
     m_view->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_view, &QWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
         QMenu *menu = m_view->createStandardContextMenu();
+
+        // Link URL a jobb klikk pozíciójánál (Qt 6.2+)
+        QUrl linkUrl;
+        if (auto *req = m_view->lastContextMenuRequest())
+            linkUrl = req->linkUrl();
+
         menu->addSeparator();
-        menu->addAction("Megnyitás új tabban", this, [this]() {
-            QUrl hoveredUrl = m_view->page()->requestedUrl();
-            if (hoveredUrl.isValid())
-                emit openInNewTab(hoveredUrl);
-        });
+
+        QAction *openNewTabAct = menu->addAction("Megnyitás új tabban");
+        if (linkUrl.isValid()) {
+            connect(openNewTabAct, &QAction::triggered, this, [this, linkUrl]() {
+                emit openInNewTab(linkUrl);
+            });
+        } else {
+            openNewTabAct->setEnabled(false);
+        }
+
         menu->addAction("Oldal forrásának megtekintése", this, [this]() {
             emit openInNewTab(QUrl("view-source:" + m_view->url().toString()));
         });
