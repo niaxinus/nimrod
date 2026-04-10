@@ -23,6 +23,7 @@ set(SOURCES
     src/nimrodbridge.cpp
     src/bookmarkstore.cpp
     src/bookmarktoolbar.cpp
+    src/integritychecker.cpp
     src/jsconsole.cpp
     src/scriptmanager.cpp
 )
@@ -36,6 +37,7 @@ set(HEADERS
     src/nimrodbridge.h
     src/bookmarkstore.h
     src/bookmarktoolbar.h
+    src/integritychecker.h
     src/jsconsole.h
     src/scriptmanager.h
 )
