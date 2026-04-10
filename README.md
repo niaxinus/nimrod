@@ -1,85 +1,104 @@
 # Nimród böngésző
 
-> ⚠️ **KÍSÉRLETI PROJEKT – NEM ÍGY KELL CSINÁLNI**
->
-> Ez a projekt kizárólag tanulási és kísérletezési célt szolgál.
-> Valódi böngésző fejlesztéséhez **ne** ezt a megközelítést használd –
-> léteznek erre a célra kifejlesztett, megbízható motorok (lásd lent).
+**Qt6/C++ alapú asztali webböngesző – Chromium (QWebEngine) motorral**
 
 ---
 
-## Mi ez?
+## Funkciók
 
-A Nimród egy Qt6/C++ alapú, kísérleti jellegű webböngesző, amely **QTextBrowser**
-és **QTextDocument** segítségével renderel HTML/CSS tartalmat. Saját preprocesszor
-pipeline-t valósít meg, hogy a Qt beépített, korlátozott HTML4/CSS2.1 renderelőjét
-kibővítse.
+- 🌐 **Teljes HTML5 / CSS3 / JavaScript** támogatás (Qt WebEngine / Chromium motor)
+- 🗂️ **Többablakos tabkezelés** – Firefox stílusú fülek
+- 🔖 **Könyvjelzők** – eszköztár, mappák, drag-and-drop mentés, kezelő (Ctrl+Shift+O)
+- 🔐 **AES-256-CBC titkosított jelszótár** – automatikus kitöltés (kulcs: Linux felhasználónév)
+- 🛡️ **Induláskor futó integritás-ellenőrzés** – SHA-256 bináris ujjlenyomat, AES titkosítva
+- 🔍 **Oldalon belüli keresés** – Ctrl+F
+- 🧩 **Userscript támogatás** – egyéni JS szkriptek betöltése oldalanként
+- 🖥️ **JavaScript fejlesztői konzol** – Ctrl+J
+- 🛠️ **DevTools** – F12
+- 🍪 **Cookie tár** – SQLite alapú, titkosítás nélküli session cookie kezelés
+- ⚙️ **Konfiguráció** – `~/.config/nimrod/config.json`, kilépéskor automatikusan mentve
+- 📋 **Menüsor** – Fájl / Szerkesztés / Súgó (billentyűkombinációk, Névjegy)
 
-## Miért kísérleti?
+---
 
-A Qt `QTextBrowser` / `QTextDocument` egy **dokumentumnézegető**, nem böngészőmotor.
-Ezért a projekt saját kóddal próbálja meg pótolni, amit egy igazi motor ingyen ad:
+## Billentyűkombinációk
 
-| Amit pótolni kell | Valódi megoldás |
+| Kombináció | Funkció |
 |---|---|
-| HTML5 szemantikus tagek | WebKit / Blink natívan kezeli |
-| CSS szelektorok (`.class`, `#id`) | CSS engine a motorban van |
-| Flexbox / Grid layout | Beépített layout motor |
-| CSS shorthand kibontás | Beépített CSS parser |
-| JavaScript | V8 / SpiderMonkey motor |
+| `Ctrl+T` | Új lap |
+| `Ctrl+W` | Lap bezárása |
+| `Ctrl+L` | URL mező fókusz |
+| `Ctrl+R` / `F5` | Oldal újratöltése |
+| `Alt+←` / `Alt+→` | Vissza / Előre |
+| `Ctrl+F` | Keresés az oldalon |
+| `Ctrl+D` | Oldal könyvjelzőzése |
+| `Ctrl+Shift+O` | Könyvjelzőkezelő |
+| `Ctrl+J` | JavaScript konzol |
+| `F12` | DevTools |
 
-Ezek mind manuálisan, regex alapon vannak implementálva – ez törékeny,
-lassú, és soha nem lesz teljes vagy hibamentes.
+---
 
-## Hogyan kellene helyesen csinálni?
+## Könyvjelzők
 
-Ha Qt-ban szeretnél böngészőt készíteni, használd:
+A könyvjelző-eszköztár a navigációs sáv **alatt**, a lapfülek **felett** jelenik meg.
 
-- **[Qt WebEngine](https://doc.qt.io/qt-6/qtwebengine-index.html)** – Chromium alapú,
-  teljes HTML5/CSS3/JS támogatással. Ez a helyes út.
-- **[Qt WebView](https://doc.qt.io/qt-6/qtwebview-index.html)** – platformfüggő
-  natív webview (iOS Safari, Android WebView).
+- **Mentés**: kattints a ★ gombra, vagy húzd a 📄 lapikont a toolbar-ra
+- **Mappák**: jobb klikk a toolbaron → *Új mappa*
+- **Kezelő**: Ctrl+Shift+O (fa nézet, szerkesztés, törlés)
 
-Ha saját motort akarsz írni (komolyan), nézd meg:
-- [WebKit](https://webkit.org/) – nyílt forrású böngészőmotor
-- [servo](https://servo.org/) – Rust alapú kísérleti motor (Mozilla)
+---
 
-## Amit ez a projekt megvalósít
+## Biztonsági funkciók
 
-- ✅ HTML5 → HTML4 normalizálás (`HtmlNormalizer`)
-- ✅ CSS preprocesszálás: `<style>`, `<link>`, `@import`, `--var`, `calc()`, media query
-- ✅ CSS shorthand kibontás (`background`, `font`, `border`, `margin`, `padding`)
-- ✅ CSS szelektorok → inline style inject (`HtmlNormalizer`)
-- ✅ Flexbox / Grid → `<table>` konverzió (`CssLayoutConverter`)
-- ✅ Képrenderelés (`loadResource` override, HTTP + file://)
-- ✅ JavaScript nullázás (`<script>`, `on*` attribútumok)
-- ✅ Konfiguráció: `~/.config/nimrod/config.ini`, kilépéskor mentés
-- ✅ Thread count detektálás (`QThread::idealThreadCount`)
-- ✅ Link hover URL megjelenítés a státuszsávban
+### Credential Autofill
+A böngésző észleli az `input[type=password]` és `input[type=text/email]` mezőket,
+és az adott oldalhoz tartozó korábbi hitelesítési adatokat automatikusan kitölti.
+Az adatok **AES-256-CBC** titkosítással tárolódnak SQLite adatbázisban
+(`~/.config/nimrod/credentials.db`). A titkosítási kulcs a Linux rendszer
+felhasználónevéből (SHA-256) képzett.
+
+### Induláskor futó integritás-ellenőrzés
+Minden induláskor a böngésző SHA-256 ujjlenyomatot számít a futtatható binárisból
+(`/proc/self/exe`), és összeveti a `~/.config/nimrod/integrity.db`-ben tárolt,
+AES-titkosított korábbi értékkel. Ha eltérést észlel, figyelmeztető ablak jelenik meg.
+
+---
 
 ## Build
 
 ```bash
-sudo apt install qt6-base-dev qt6-tools-dev cmake build-essential
+# Függőségek (Debian/Ubuntu)
+sudo apt install qt6-base-dev qt6-webengine-dev qt6-tools-dev \
+                 libqt6sql6-sqlite libssl-dev cmake build-essential
 
+# Fordítás
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ./nimrod
 ```
 
+---
+
 ## Konfiguráció
 
-`~/.config/nimrod/config.ini` – automatikusan létrejön első futtatáskor.
-
-```ini
-[window]
-geometry=...
-
-[system]
-threadCount=8
-```
+`~/.config/nimrod/config.json` – automatikusan létrejön az első indításkor,
+és kilépéskor frissül (ablakméret, utolsó URL, stb.).
 
 ---
 
-*Nimród – kísérleti projekt. Fejlesztő: GitHub Copilot CLI segítségével.*
+## Rendszerkövetelmények
+
+- Linux (x86_64)
+- Qt 6.4 vagy újabb
+- OpenSSL 3.x
+- CMake 3.16+
+
+---
+
+## Licenc és szerzői jogok
+
+**Copyright © 2026 Komka László – Minden jog fenntartva.**
+
+A szoftver forráskódja és minden kapcsolódó fájlja Komka László szellemi tulajdona.
+Engedély nélküli másolás, terjesztés, módosítás vagy felhasználás tilos.
