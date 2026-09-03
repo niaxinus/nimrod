@@ -19,9 +19,10 @@ A v2.0 ezt javítja:
 | **`ForcePersistentCookies` + tartós jogosultságok** | a bejelentkezés újraindítás után is megmarad |
 | **Autoplay engedélyezve** (`--autoplay-policy`, `PlaybackRequiresUserGesture=false`) | néma videó-automatalejátszás, mint egy sima Chrome |
 | **`hu-HU` Accept-Language** | magyar nyelvű FB felület |
+| **Single-instance zár** (`QLockFile`) | két egyidejű példány közös profilja `Database IO error`-t és összeomlást (SIGSEGV) okozott service worker-t regisztráló oldalakon (pl. Google-keresés); a második példány most figyelmeztet és kilép |
 
 Érintett fájlok: `src/nimrodpage.{h,cpp}` (új), `src/browsertab.{h,cpp}`,
-`src/mainwindow.cpp`, `src/main.cpp`, `CMakeLists.txt`.
+`src/mainwindow.cpp`, `src/main.cpp`, `src/integritychecker.cpp`, `CMakeLists.txt`.
 
 ---
 
