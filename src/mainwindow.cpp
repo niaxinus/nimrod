@@ -147,13 +147,20 @@ MainWindow::MainWindow(QWidget *parent)
     s->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture,        false);
     s->setAttribute(QWebEngineSettings::ScreenCaptureEnabled,               true);
 
-    // ── SQLite cookie tár ──────────────────────────────────────────────────
+    // ── SQLite cookie tár (csak olvasható tükör / export) ─────────────────
     QString configDir = QDir::homePath() + "/.config/nimrod";
     QDir().mkpath(configDir);
 
     m_cookieStore = new CookieStore(this);
     if (m_cookieStore->init(configDir + "/cookies.db")) {
-        m_cookieStore->loadInto(m_profile->cookieStore());
+        // FONTOS: a cookie-kat NEM töltjük vissza a böngészőbe.
+        // A ForcePersistentCookies miatt a QtWebEngine már magától,
+        // teljes hűséggel (SameSite, partíció, forrás-séma) eltárol
+        // minden cookie-t a saját tárában. A loadInto() visszatöltése
+        // veszteséges volt (elveszett a SameSite + a forrás-origin),
+        // és emiatt a Google / Facebook "CookieMismatch"-et jelzett.
+        // A connectTo() csak egy plain-text tükröt ír a cookies.db-be
+        // (kézi megtekintéshez), a böngésző működését nem befolyásolja.
         m_cookieStore->connectTo(m_profile->cookieStore());
     }
 
