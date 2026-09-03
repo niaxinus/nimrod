@@ -8,6 +8,7 @@
 #include <QWebEngineHistory>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
+#include <QWebEngineFullScreenRequest>
 #include <QWebChannel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -20,10 +21,15 @@
 #include <QTextStream>
 #include <QCoreApplication>
 
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+#include <QWebEnginePermission>
+#endif
+
 BrowserTab::BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget *parent)
     : QWidget(parent)
 {
-    QWebEnginePage *page = new QWebEnginePage(profile, this);
+    m_page = new NimrodPage(profile, this);
+    QWebEnginePage *page = m_page;
     m_view = new QWebEngineView(this);
     m_view->setPage(page);
 
@@ -39,11 +45,11 @@ BrowserTab::BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget
     m_jsConsole->setPage(page);
     m_jsConsole->hide();
 
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
-    layout->addWidget(m_view, 1);
-    layout->addWidget(m_jsConsole);
+    m_layout = new QVBoxLayout(this);
+    m_layout->setContentsMargins(0, 0, 0, 0);
+    m_layout->setSpacing(0);
+    m_layout->addWidget(m_view, 1);
+    m_layout->addWidget(m_jsConsole);
 
     // Jobb klikk – egyedi context menu
     m_view->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -74,6 +80,7 @@ BrowserTab::BrowserTab(QWebEngineProfile *profile, NimrodBridge *bridge, QWidget
     });
 
     setupConnections();
+    setupPermissionHandling();
 }
 
 BrowserTab::~BrowserTab()
@@ -82,6 +89,18 @@ BrowserTab::~BrowserTab()
         m_devToolsView->close();
         m_devToolsView = nullptr;
     }
+    // Ha teljes képernyős videó közben zárjuk be a lapot, a m_view egy külön
+    // top-level ablak (nincs szülője) → kézzel kell felszabadítani.
+    if (m_isFullScreen && m_view) {
+        m_view->setParent(nullptr);
+        m_view->deleteLater();
+    }
+}
+
+void BrowserTab::setTabFactory(NimrodPage::TabFactory factory)
+{
+    if (m_page)
+        m_page->setTabFactory(std::move(factory));
 }
 
 void BrowserTab::load(const QUrl &url)
@@ -188,6 +207,69 @@ void BrowserTab::setupConnections()
     connect(m_view, &QWebEngineView::loadProgress, this, &BrowserTab::loadProgress);
     connect(m_view, &QWebEngineView::loadFinished, this, &BrowserTab::loadFinished);
     connect(m_view->page(), &QWebEnginePage::linkHovered, this, &BrowserTab::linkHovered);
+
+    // ── Teljes képernyő kérés (Facebook / YouTube videó, Reels) ───────────
+    connect(m_view->page(), &QWebEnginePage::fullScreenRequested, this,
+            [this](QWebEngineFullScreenRequest request) {
+        request.accept();
+        if (request.toggleOn())
+            enterFullScreen();
+        else
+            exitFullScreen();
+    });
+}
+
+// ── Teljes képernyő: a webnézetet külön top-level ablakká tesszük ──────────
+void BrowserTab::enterFullScreen()
+{
+    if (m_isFullScreen) return;
+    m_isFullScreen = true;
+    m_layout->removeWidget(m_view);
+    m_view->setParent(nullptr);
+    m_view->setWindowFlags(Qt::Window);
+    m_view->showFullScreen();
+    m_view->setFocus();
+}
+
+void BrowserTab::exitFullScreen()
+{
+    if (!m_isFullScreen) return;
+    m_isFullScreen = false;
+    m_view->setWindowFlags(Qt::Widget);
+    m_layout->insertWidget(0, m_view, 1);
+    m_view->showNormal();
+    m_view->setFocus();
+}
+
+// ── Jogosultság-kérések (értesítés, kamera, mikrofon, helyzet) ─────────────
+// Facebook induláskor értesítés-jogot kér; a többit alapból elutasítjuk,
+// hogy a JS Promise ne "lógjon be" válaszra várva.
+void BrowserTab::setupPermissionHandling()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    connect(m_page, &QWebEnginePage::permissionRequested, this,
+            [](QWebEnginePermission permission) {
+        switch (permission.permissionType()) {
+        case QWebEnginePermission::PermissionType::Notifications:
+        case QWebEnginePermission::PermissionType::ClipboardReadWrite:
+            permission.grant();
+            break;
+        default:
+            permission.deny();
+            break;
+        }
+    });
+#else
+    connect(m_page, &QWebEnginePage::featurePermissionRequested, this,
+            [this](const QUrl &origin, QWebEnginePage::Feature feature) {
+        if (feature == QWebEnginePage::Notifications)
+            m_page->setFeaturePermission(origin, feature,
+                                        QWebEnginePage::PermissionGrantedByUser);
+        else
+            m_page->setFeaturePermission(origin, feature,
+                                        QWebEnginePage::PermissionDeniedByUser);
+    });
+#endif
 }
 
 QWebEnginePage *BrowserTab::page() const

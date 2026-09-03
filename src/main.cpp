@@ -9,6 +9,13 @@
 
 int main(int argc, char *argv[])
 {
+    // ── Chromium flag-ek – a QApplication előtt kell beállítani ───────────
+    // - autoplay: a Facebook / YouTube videók néma automatikus lejátszása
+    // - WebRTC hálózati lista: FB Messenger hívások stabilabb ICE-je
+    qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
+            "--autoplay-policy=no-user-gesture-required "
+            "--enable-features=WebRTCPipeWireCapturer");
+
     // WebEngine szükséges inicializáció az app előtt
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 

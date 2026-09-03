@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(nimrod VERSION 1.0 LANGUAGES CXX)
+project(nimrod VERSION 2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,6 +17,7 @@ set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
     src/browsertab.cpp
+    src/nimrodpage.cpp
     src/configmanager.cpp
     src/cookiestore.cpp
     src/credentialstore.cpp
@@ -31,6 +32,7 @@ set(SOURCES
 set(HEADERS
     src/mainwindow.h
     src/browsertab.h
+    src/nimrodpage.h
     src/configmanager.h
     src/cookiestore.h
     src/credentialstore.h

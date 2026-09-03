@@ -108,7 +108,23 @@ MainWindow::MainWindow(QWidget *parent)
     m_profile->setPersistentStoragePath(dataPath);
     m_profile->setCachePath(dataPath + "/cache");
     m_profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
-    m_profile->setPersistentCookiesPolicy(QWebEngineProfile::AllowPersistentCookies);
+    m_profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
+
+    // ── User-Agent – tiszta Chrome (nincs "QtWebEngine/x.y" token) ────────
+    // A Facebook (és több más nagy oldal) az ismeretlen / QtWebEngine UA-t
+    // "nem támogatott böngészőként" kezeli, és lebutított oldalt vagy
+    // hibás bejelentkezést ad vissza. Egy sima asztali Chrome UA megoldja.
+    m_profile->setHttpUserAgent(
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36");
+    m_profile->setHttpAcceptLanguage("hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7");
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    // A megadott jogosultságokat (értesítés, kamera…) tartósan eltároljuk,
+    // hogy ne kérdezzen rá minden indításkor.
+    m_profile->setPersistentPermissionsPolicy(
+        QWebEngineProfile::PersistentPermissionsPolicy::StoreOnDisk);
+#endif
 
     // ── JavaScript és feature beállítások ─────────────────────────────────
     QWebEngineSettings *s = m_profile->settings();
@@ -127,6 +143,9 @@ MainWindow::MainWindow(QWidget *parent)
     s->setAttribute(QWebEngineSettings::DnsPrefetchEnabled,                 true);
     s->setAttribute(QWebEngineSettings::SpatialNavigationEnabled,           false);
     s->setAttribute(QWebEngineSettings::AllowRunningInsecureContent,        false);
+    // Facebook videók / Reels: engedjük a néma autoplay-t, mint egy sima Chrome
+    s->setAttribute(QWebEngineSettings::PlaybackRequiresUserGesture,        false);
+    s->setAttribute(QWebEngineSettings::ScreenCaptureEnabled,               true);
 
     // ── SQLite cookie tár ──────────────────────────────────────────────────
     QString configDir = QDir::homePath() + "/.config/nimrod";
@@ -181,6 +200,13 @@ BrowserTab *MainWindow::newTab(const QUrl &url)
     int idx = m_tabWidget->addTab(tab, "Új tab");
     m_tabWidget->setCurrentIndex(idx);
     connectTab(tab, idx);
+
+    // window.open() / target="_blank" / Facebook belépő-pop-up → új lap.
+    // A Chromium a visszaadott page-re navigálja a kért URL-t.
+    tab->setTabFactory([this]() -> QWebEnginePage * {
+        BrowserTab *child = newTab();
+        return child ? child->page() : nullptr;
+    });
 
     connect(tab, &BrowserTab::openInNewTab, this, [this](const QUrl &u) {
         newTab(u);

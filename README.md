@@ -1,6 +1,27 @@
-# Nimród böngésző
+# Nimród böngésző – v2.0
 
 **Qt6/C++ alapú asztali webböngesző – Chromium (QWebEngine) motorral**
+
+---
+
+## Újdonságok a 2.0-ban – Facebook / modern oldal kompatibilitás
+
+A v1.0 az ismeretlen (QtWebEngine) User-Agent és a hiányzó pop-up kezelés
+miatt a Facebookon lebutított oldalt adott, és a bejelentkezés is akadozott.
+A v2.0 ezt javítja:
+
+| Változás | Mit old meg |
+|---|---|
+| **Tiszta Chrome User-Agent** (`Chrome/138`, `QtWebEngine/x.y` token nélkül) | FB nem "nem támogatott böngészőt" jelez, rendes asztali oldalt ad |
+| **`NimrodPage::createWindow()`** – `window.open()` / `target="_blank"` / OAuth pop-up új lapként nyílik | FB bejelentkezés, "Belépés Google-fiókkal", fotónézegető, megosztás ablakok |
+| **Teljes képernyő kérés kezelése** (`fullScreenRequested`) | FB videók, Reels, Watch teljes képernyőn |
+| **Jogosultság-kezelés** (`permissionRequested`) – értesítés engedélyezve, kamera/mikrofon/helyzet tisztán elutasítva | a JS Promise nem "lóg be", az oldal nem akad meg |
+| **`ForcePersistentCookies` + tartós jogosultságok** | a bejelentkezés újraindítás után is megmarad |
+| **Autoplay engedélyezve** (`--autoplay-policy`, `PlaybackRequiresUserGesture=false`) | néma videó-automatalejátszás, mint egy sima Chrome |
+| **`hu-HU` Accept-Language** | magyar nyelvű FB felület |
+
+Érintett fájlok: `src/nimrodpage.{h,cpp}` (új), `src/browsertab.{h,cpp}`,
+`src/mainwindow.cpp`, `src/main.cpp`, `CMakeLists.txt`.
 
 ---
 
