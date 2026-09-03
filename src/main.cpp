@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <QDir>
 #include <QDateTime>
+#include <QLockFile>
 
 int main(int argc, char *argv[])
 {
@@ -24,10 +25,40 @@ int main(int argc, char *argv[])
     app.setOrganizationName("nimrod");
     app.setApplicationVersion("2.0");
 
-    // ── Integrity check ──────────────────────────────────────────────────
     QString configDir = QDir::homePath() + "/.config/nimrod";
     QDir().mkpath(configDir);
 
+    // ── Single-instance zár ──────────────────────────────────────────────
+    // A QWebEngineProfile perzisztens tára (cookie-k, előzmények, service
+    // worker DB-k) egyszerre csak EGY folyamatból írható. Ha egy második
+    // példány is megnyitja ugyanazt a profilt, a Chromium tárrétege
+    // "Database IO error"-t dob, és a böngészőfolyamat elszáll (SIGSEGV) –
+    // tipikusan akkor, amikor egy oldal (pl. Google) service worker-t
+    // regisztrál. Ezért itt lezárjuk a profilt egy lock fájllal.
+    // (A QLockFile felismeri, ha a korábbi PID már nem él – crash után nem
+    //  marad bent a zár.)
+    static QLockFile lockFile(configDir + "/nimrod.lock");
+    if (!lockFile.tryLock(200)) {
+        qint64 pid = 0;
+        QString host, app;
+        lockFile.getLockInfo(&pid, &host, &app);
+        QMessageBox box;
+        box.setWindowTitle("Nimród már fut");
+        box.setIcon(QMessageBox::Warning);
+        box.setText("<b>A Nimród böngésző már fut ebből a felhasználói fiókból.</b>");
+        box.setInformativeText(
+            QString("Egyszerre csak egy példány futhat, mert közös a profil-tár "
+                    "(cookie-k, előzmények, bejelentkezések).\n\n"
+                    "Zárd be a másik ablakot, vagy állítsd le a régi folyamatot:\n"
+                    "    pkill nimrod\n\n"
+                    "(Zároló folyamat PID-je: %1)")
+                .arg(pid > 0 ? QString::number(pid) : QStringLiteral("ismeretlen")));
+        box.setStandardButtons(QMessageBox::Ok);
+        box.exec();
+        return 1;
+    }
+
+    // ── Integrity check ──────────────────────────────────────────────────
     bool integrityOk = IntegrityChecker::check(configDir + "/integrity.db");
     if (!integrityOk) {
         QMessageBox warn;
