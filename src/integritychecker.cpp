@@ -164,47 +164,53 @@ bool IntegrityChecker::check(const QString &dbPath)
         return true;
     }
 
-    // 3. Séma létrehozása
-    QSqlQuery q(db);
-    q.exec(R"(
-        CREATE TABLE IF NOT EXISTS fingerprints (
-            id          INTEGER PRIMARY KEY,
-            fingerprint TEXT    NOT NULL,
-            updated_at  INTEGER NOT NULL DEFAULT 0
-        )
-    )");
-
-    // 4. Tárolt ujjlenyomat lekérése
-    q.exec("SELECT fingerprint FROM fingerprints WHERE id=1");
+    // 4. Ellenőrzés / mentés
+    // FONTOS: minden QSqlQuery-nek meg kell semmisülnie, mielőtt a
+    // removeDatabase() hívódik, különben a Qt "connection ... is still in use"
+    // figyelmeztetést ad – ezért külön blokkban tartjuk őket.
     bool matched = true;
+    {
+        // 3. Séma létrehozása
+        QSqlQuery q(db);
+        q.exec(R"(
+            CREATE TABLE IF NOT EXISTS fingerprints (
+                id          INTEGER PRIMARY KEY,
+                fingerprint TEXT    NOT NULL,
+                updated_at  INTEGER NOT NULL DEFAULT 0
+            )
+        )");
 
-    if (q.next()) {
-        // Van tárolt ujjlenyomat – összehasonlítás
-        QString storedEnc = q.value(0).toString();
-        QByteArray storedHash = decrypt(storedEnc);
+        // Tárolt ujjlenyomat lekérése
+        q.exec("SELECT fingerprint FROM fingerprints WHERE id=1");
 
-        matched = (storedHash == currentHash);
+        if (q.next()) {
+            // Van tárolt ujjlenyomat – összehasonlítás
+            QString storedEnc = q.value(0).toString();
+            QByteArray storedHash = decrypt(storedEnc);
 
-        if (!matched) {
-            qWarning() << "IntegrityChecker: ELTÉRÉS ÉSZLELVE! A bináris megváltozott.";
+            matched = (storedHash == currentHash);
+
+            if (!matched) {
+                qWarning() << "IntegrityChecker: ELTÉRÉS ÉSZLELVE! A bináris megváltozott.";
+            }
+
+            // Frissítés az aktuálisra
+            QString newEnc = encrypt(currentHash);
+            QSqlQuery upd(db);
+            upd.prepare("UPDATE fingerprints SET fingerprint=:f, updated_at=:t WHERE id=1");
+            upd.bindValue(":f", newEnc);
+            upd.bindValue(":t", QDateTime::currentSecsSinceEpoch());
+            upd.exec();
+        } else {
+            // Első futás – mentés
+            QString enc = encrypt(currentHash);
+            QSqlQuery ins(db);
+            ins.prepare("INSERT INTO fingerprints (id, fingerprint, updated_at) VALUES (1, :f, :t)");
+            ins.bindValue(":f", enc);
+            ins.bindValue(":t", QDateTime::currentSecsSinceEpoch());
+            ins.exec();
+            qDebug() << "IntegrityChecker: Első futás, ujjlenyomat elmentve.";
         }
-
-        // Frissítés az aktuálisra
-        QString newEnc = encrypt(currentHash);
-        QSqlQuery upd(db);
-        upd.prepare("UPDATE fingerprints SET fingerprint=:f, updated_at=:t WHERE id=1");
-        upd.bindValue(":f", newEnc);
-        upd.bindValue(":t", QDateTime::currentSecsSinceEpoch());
-        upd.exec();
-    } else {
-        // Első futás – mentés
-        QString enc = encrypt(currentHash);
-        QSqlQuery ins(db);
-        ins.prepare("INSERT INTO fingerprints (id, fingerprint, updated_at) VALUES (1, :f, :t)");
-        ins.bindValue(":f", enc);
-        ins.bindValue(":t", QDateTime::currentSecsSinceEpoch());
-        ins.exec();
-        qDebug() << "IntegrityChecker: Első futás, ujjlenyomat elmentve.";
     }
 
     db.close();
