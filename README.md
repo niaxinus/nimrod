@@ -20,6 +20,7 @@ A v2.0 ezt javítja:
 | **Autoplay engedélyezve** (`--autoplay-policy`, `PlaybackRequiresUserGesture=false`) | néma videó-automatalejátszás, mint egy sima Chrome |
 | **`hu-HU` Accept-Language** | magyar nyelvű FB felület |
 | **Single-instance zár** (`QLockFile`) | két egyidejű példány közös profilja `Database IO error`-t és összeomlást (SIGSEGV) okozott service worker-t regisztráló oldalakon (pl. Google-keresés); a második példány most figyelmeztet és kilép |
+| **Cookie-visszatöltés kikapcsolva** | a `CookieStore` veszteségesen (SameSite, forrás-origin nélkül) töltötte vissza a cookie-kat, ezért a Google `CookieMismatch`-et jelzett; a `ForcePersistentCookies` mellett a QtWebEngine saját tára veszi át, a `cookies.db` már csak olvasható tükör |
 
 Érintett fájlok: `src/nimrodpage.{h,cpp}` (új), `src/browsertab.{h,cpp}`,
 `src/mainwindow.cpp`, `src/main.cpp`, `src/integritychecker.cpp`, `CMakeLists.txt`.
