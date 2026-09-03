@@ -12,7 +12,7 @@ A v2.0 ezt javítja:
 
 | Változás | Mit old meg |
 |---|---|
-| **Tiszta Chrome User-Agent** (`Chrome/138`, `QtWebEngine/x.y` token nélkül) | FB nem "nem támogatott böngészőt" jelez, rendes asztali oldalt ad |
+| **Asztali Firefox User-Agent** + `--disable-features=UserAgentClientHint` | FB nem "nem támogatott böngészőt" jelez; a Google bejelentkezés sem tiltja ("a böngésző nem biztonságos"), mert Firefox-ként nincs `Sec-CH-UA` client hint, amit a Google keresztbe nézhetne |
 | **`NimrodPage::createWindow()`** – `window.open()` / `target="_blank"` / OAuth pop-up új lapként nyílik | FB bejelentkezés, "Belépés Google-fiókkal", fotónézegető, megosztás ablakok |
 | **Teljes képernyő kérés kezelése** (`fullScreenRequested`) | FB videók, Reels, Watch teljes képernyőn |
 | **Jogosultság-kezelés** (`permissionRequested`) – értesítés engedélyezve, kamera/mikrofon/helyzet tisztán elutasítva | a JS Promise nem "lóg be", az oldal nem akad meg |

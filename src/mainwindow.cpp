@@ -110,13 +110,24 @@ MainWindow::MainWindow(QWidget *parent)
     m_profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
     m_profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
 
-    // ── User-Agent – tiszta Chrome (nincs "QtWebEngine/x.y" token) ────────
-    // A Facebook (és több más nagy oldal) az ismeretlen / QtWebEngine UA-t
-    // "nem támogatott böngészőként" kezeli, és lebutított oldalt vagy
-    // hibás bejelentkezést ad vissza. Egy sima asztali Chrome UA megoldja.
+    // ── User-Agent – asztali Firefox ─────────────────────────────────────
+    // Miért Firefox és nem Chrome?
+    //  • A Facebook az eredeti gondot a UA "QtWebEngine/x.y" tokene okozta
+    //    ("nem támogatott böngésző") – ez bármely token nélküli, valódi
+    //    böngésző-UA-val megszűnik.
+    //  • A Google bejelentkezés ("a böngésző nem biztonságos") a Chrome-nak
+    //    kiadott, de nem-Chrome motort futtató böngészőket kifejezetten
+    //    tiltja: keresztbe nézi a Sec-CH-UA client hint-eket és a TLS-t.
+    //    Egy Chrome-UA + hiányzó/eltérő client hint = azonnali tiltás.
+    //  • Firefox nem küld Sec-CH-UA-t, így nincs mit keresztbe nézni; a
+    //    Google "secure browser" ellenőrzése átengedi (ez a bevett fix a
+    //    QtWebEngine-alapú böngészőknél, pl. qutebrowser).
+    // A Chromium oldalon a UA client hint-eket ki is kapcsoljuk
+    // (--disable-features=UserAgentClientHint, lásd main.cpp), hogy a
+    // Firefox-identitás konzisztens legyen (nincs Sec-CH-UA, nincs
+    // navigator.userAgentData).
     m_profile->setHttpUserAgent(
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36");
+        "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0");
     m_profile->setHttpAcceptLanguage("hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7");
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)

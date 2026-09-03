@@ -13,9 +13,15 @@ int main(int argc, char *argv[])
     // ── Chromium flag-ek – a QApplication előtt kell beállítani ───────────
     // - autoplay: a Facebook / YouTube videók néma automatikus lejátszása
     // - WebRTC hálózati lista: FB Messenger hívások stabilabb ICE-je
+    // - UserAgentClientHint KI: a böngésző Firefox UA-t ad ki (lásd
+    //   mainwindow.cpp); a Firefox nem küld Sec-CH-UA client hint-eket, így
+    //   ha a Chromium mégis küldené, az ellentmondás lenne, amit a Google
+    //   bejelentkezés "nem biztonságos böngészőként" tiltana. Kikapcsolva
+    //   nincs Sec-CH-UA fejléc és nincs navigator.userAgentData sem.
     qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
             "--autoplay-policy=no-user-gesture-required "
-            "--enable-features=WebRTCPipeWireCapturer");
+            "--enable-features=WebRTCPipeWireCapturer "
+            "--disable-features=UserAgentClientHint");
 
     // WebEngine szükséges inicializáció az app előtt
     QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
